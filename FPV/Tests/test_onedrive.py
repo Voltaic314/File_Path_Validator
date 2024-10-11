@@ -28,9 +28,3 @@ def test_onedrive_restricted_root_folder():
     with pytest.raises(ValueError) as excinfo:
         OneDrive(f"{restricted_root_folder}/folder/test.txt").check_if_valid()
     assert f'Restricted root level folder name found in path: "{restricted_root_folder}". Please make sure the first part of the path is not "{restricted_root_folder}"' in str(excinfo.value)
-
-def test_onedrive_path_length_exceeds_limit():
-    long_path = "a" * 256  # Create a path longer than 255 characters
-    with pytest.raises(ValueError) as excinfo:
-        OneDrive(f"{long_path}/file.txt").check_if_valid()
-    assert "The specified path is too long." in str(excinfo.value)

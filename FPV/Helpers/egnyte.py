@@ -15,11 +15,15 @@ class Egnyte(BaseService):
 
         # List of restricted names
         RESTRICTED_NAMES = {
-            ".ds_store", ".metadata_never_index", ".thumbs.db", "powerpoint temp", "desktop.ini", "icon\r"
+            ".ds_store", 
+            ".metadata_never_index", 
+            ".thumbs.db", 
+            "powerpoint temp", 
+            "desktop.ini", 
         }
 
         # List of endings, starts, and other special checks
-        ENDINGS = ['.', '~', '._attribs_', '._rights_', '._egn_', '_egnmeta', '.tmp', '-spotlight', '.ac$', '.sv$', '.~vsdx']
+        ENDINGS = ['~', '._attribs_', '._rights_', '._egn_', '_egnmeta', '.tmp', '-spotlight', '.ac$', '.sv$', '.~vsdx']
         STARTS = ['._', '.~', 'word work file', '_egn_.', '.smbdelete']
         STARTS_WITH_TILDE_ENDINGS = ['.idlk', '.xlsx', '.xlsx (deleted)', '.pptx', '.pptx (deleted)']
         STARTS_WITH_TILDE_DOLLAR_ENDINGS = ['.doc', '.docx', '.docx (deleted)', '.rtf', '.ppt', '.pptx', '.pptx (deleted)', '.xlsm', '.xlsm (deleted)', '.sldlfp', '.slddrw', '.sldprt', '.sldasm']

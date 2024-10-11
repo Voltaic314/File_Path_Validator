@@ -41,10 +41,6 @@ class SharePoint(BaseService):
             if part in RESTRICTED_NAMES:
                 raise ValueError(f'Restricted name found in path: "{part}"')
             
-            # Check for leading or trailing spaces
-            if part != part.strip():
-                raise ValueError(f'Leading or trailing spaces found in path: "{part}"')
-            
             # Check for restricted prefixes
             if part.startswith(RESTRICTED_PREFIX):
                 raise ValueError(f'Restricted prefix found in path: "{part}"')

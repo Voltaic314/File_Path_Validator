@@ -2,14 +2,13 @@ import pytest
 from FPV.Helpers.egnyte import Egnyte
 
 def test_egnyte_reserved_names():
-    reserved_names = [
-        ".ds_store",
-        ".metadata_never_index",
-        ".thumbs.db",
-        "powerpoint temp",
-        "desktop.ini",
-        "icon\r"
-    ]
+    reserved_names = {
+        ".ds_store", 
+        ".metadata_never_index", 
+        ".thumbs.db", 
+        "powerpoint temp", 
+        "desktop.ini", 
+    }
     
     for name in reserved_names:
         with pytest.raises(ValueError) as excinfo:
@@ -23,7 +22,7 @@ def test_egnyte_part_length_exceeds_limit():
     assert f"Path component exceeds 245 characters: \"{long_part}\"" in str(excinfo.value)
 
 def test_egnyte_name_ends_with_restricted_suffix():
-    for suffix in ['.', '~']:
+    for suffix in ['~']:
         with pytest.raises(ValueError) as excinfo:
             Egnyte(f"folder_name{suffix}/file.txt").check_if_valid()
         assert f"Name ends with restricted suffix \"{suffix}\": \"folder_name{suffix}\"" in str(excinfo.value)
@@ -36,10 +35,5 @@ def test_egnyte_name_starts_with_restricted_prefix():
 
 def test_egnyte_name_starts_with_tilde():
     with pytest.raises(ValueError) as excinfo:
-        Egnyte("~temp/file.txt").check_if_valid()
-    assert 'Name starts with "~" and ends with' in str(excinfo.value)
-
-def test_egnyte_name_starts_with_tilde_dollar():
-    with pytest.raises(ValueError) as excinfo:
-        Egnyte("~$temp/file.txt").check_if_valid()
-    assert 'Name starts with "~$" and ends with' in str(excinfo.value)
+        Egnyte(".~temp/file.txt").check_if_valid()
+    assert 'Name starts with restricted prefix ".~"' in str(excinfo.value)

@@ -10,6 +10,8 @@ class BaseService:
         self.path = f"/{self.path}" if not self.path.startswith("/") else self.path
         self.path_length = len(self.path)
         self.path_parts = self.path.strip("/").split('/') if '/' in self.path else [self.path]
+        self.filename = self.path_parts[-1]
+        self.filename_ext = self.filename.split('.')[-1] if '.' in self.filename else ''
 
     @staticmethod
     def path_part_contains_invalid_characters(part):
@@ -43,6 +45,8 @@ class BaseService:
         """Perform folder-specific checks."""
         self.check_invalid_character(part)
         self.check_leading_trailing_spaces(part)
+        if part.endswith("."):
+            raise ValueError(f'Folder names cannot end with a period: "{part}".')
 
     def check_if_valid_filename(self, filename):
         """Perform filename-specific checks."""
