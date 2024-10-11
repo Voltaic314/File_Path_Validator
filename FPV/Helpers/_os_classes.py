@@ -1,24 +1,7 @@
 from FPV.Helpers._base_service import BaseService
 
 
-class OSBase(BaseService):
-    def __init__(self, path: str, service: str):
-        super().__init__(path)  # Call BaseService initializer
-        self.service = service.lower()
-
-    def check_if_valid(self):
-        if self.service == "windows":
-            return Windows(self.path).check_if_valid()
-        elif self.service == "mac_os":
-            return MacOS(self.path).check_if_valid()
-        elif self.service == "linux":
-            return Linux(self.path).check_if_valid()
-        else:
-            raise ValueError(f"Unsupported OS service: {self.service}")
-
-
-class Windows(OSBase):
-
+class Windows(BaseService):
     def check_if_valid(self):
         """Check validity of the full path for Windows, including base checks and Windows-specific checks."""
         super().check_if_valid()  # Calls the base validation logic
@@ -34,21 +17,19 @@ class Windows(OSBase):
                 raise ValueError(f'Reserved name "{part}" is not allowed in Windows.')
 
 
-class MacOS(OSBase):
+class MacOS(BaseService):
     # mac os doesn't have any invalid characters other than 
     # the obvious path delimiter but we're already handling that 
-    # in the base class. :) 
+    # in the base class. 
     invalid_characters = '' 
-
-    def __init__(self, path: str):
-        super().__init__(path)
 
     def check_if_valid(self):
         super().check_if_valid()  # Call base validation first
 
         # Check for reserved file names (not explicitly required, but avoid common issues)
         RESTRICTED_NAMES = {
-            ".DS_Store", "Icon\\r", "Thumbs.db"
+            ".DS_Store",
+            "._myfile"
         }
 
         if self.filename in RESTRICTED_NAMES:
@@ -57,11 +38,8 @@ class MacOS(OSBase):
         return True
 
 
-class Linux(OSBase):
+class Linux(BaseService):
     invalid_characters = '\0'  # Only null character is invalid in Linux
-
-    def __init__(self, path: str):
-        super().__init__(path)
 
     def check_if_valid(self):
         super().check_if_valid()  # Call base validation first

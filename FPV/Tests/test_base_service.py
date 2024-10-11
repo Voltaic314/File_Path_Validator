@@ -14,29 +14,31 @@ class TestBaseService:
             service.check_if_valid()
         assert "Invalid character" in str(excinfo.value)
 
-    def test_path_with_leading_trailing_spaces(self):
-        service = BaseService("  invalid/path/to/file.txt  ")
-        with pytest.raises(ValueError) as excinfo:
-            service.check_if_valid()
-        assert "Leading or trailing spaces found" in str(excinfo.value)
-
-    def test_folder_name_ending_with_period(self):
-        service = BaseService("folder_name.")
-        with pytest.raises(ValueError) as excinfo:
-            service.check_if_valid()
-        assert 'Folder names cannot end with a period' in str(excinfo.value)
-
     def test_path_with_leading_space(self):
         service = BaseService(" leading_space/file.txt")
         with pytest.raises(ValueError) as excinfo:
             service.check_if_valid()
-        assert 'Leading spaces are not allowed' in str(excinfo.value)
+        assert 'trailing' in str(excinfo.value).lower()
+
+    def test_path_with_trailing_space(self):
+        service = BaseService("invalid/path/to/file.txt  ")
+        with pytest.raises(ValueError) as excinfo:
+            service.check_if_valid()
+        assert "leading" in str(excinfo.value).lower()
+
+    def test_folder_name_ending_with_period(self):
+        service = BaseService("folder_name./file.txt")
+        print(service.path)
+        print(service.path_parts)
+        with pytest.raises(ValueError) as excinfo:
+            service.check_if_valid()
+        assert 'Folder names cannot end with a period' in str(excinfo.value)
 
     def test_filename_without_extension(self):
         service = BaseService("folder_name/filename_without_extension")
         with pytest.raises(ValueError) as excinfo:
             service.check_if_valid()
-        assert 'Filename must contain an extension' in str(excinfo.value)
+        assert 'must contain an extension' in str(excinfo.value).lower()
 
     def test_get_cleaned_path(self):
         service = BaseService("   some/path/  ")

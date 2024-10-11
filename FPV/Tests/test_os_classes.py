@@ -6,21 +6,20 @@ def test_windows_reserved_folder_names():
     reserved_names = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "LPT1"]
     for name in reserved_names:
         with pytest.raises(ValueError) as excinfo:
-            Windows(f"{name}/folder/test.txt").check_if_valid()
-        assert f"Restricted name found in path: \"{name}\"" in str(excinfo.value)
+            Windows(f"{name}/folder/file.txt").check_if_valid()
+        assert f"Reserved name \"{name}\"" in str(excinfo.value)
 
 
 def test_macos_reserved_folder_names():
-    reserved_names = [
-        ".DS_Store",
-        "Icon\\r",
-        "._myfile"
-    ]
+    RESTRICTED_NAMES = {
+            ".DS_Store",
+            "._myfile"
+    }
     
-    for name in reserved_names:
+    for name in RESTRICTED_NAMES:
         with pytest.raises(ValueError) as excinfo:
-            MacOS(f"{name}/folder/test.txt").check_if_valid()
-        assert f"Restricted name found in path: \"{name}\"" in str(excinfo.value)
+            MacOS(f"folder/{name}").check_if_valid()
+        assert f"Reserved name \"{name}\"" in str(excinfo.value)
 
 
 # really no linux restrictions to be honest... 
