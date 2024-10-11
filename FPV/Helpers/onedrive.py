@@ -1,11 +1,10 @@
 import re
-from Helpers._base_service import BaseService
+from FPV.Helpers._base_service import BaseService
 
-
-class SharePoint(BaseService):
-    # Invalid characters for SharePoint file and folder names
+class OneDrive(BaseService):
+    # Invalid characters for OneDrive file and folder names
     invalid_characters = '<>:"/\\|?*#'
-    
+
     def __init__(self, path: str, windows_sync: bool = True):
         super().__init__(path)
         
@@ -21,7 +20,7 @@ class SharePoint(BaseService):
 
     @staticmethod
     def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(SharePoint.invalid_characters)}]")
+        invalid_pattern = re.compile(f"[{re.escape(OneDrive.invalid_characters)}]")
         return re.search(invalid_pattern, part)
 
     def check_if_valid(self):
@@ -48,11 +47,11 @@ class SharePoint(BaseService):
         # Check each part of the path
         for part in self.path_parts:
             # Check for invalid characters
-            invalid_character = SharePoint.path_part_contains_invalid_characters(part)
+            invalid_character = OneDrive.path_part_contains_invalid_characters(part)
             if invalid_character:
                 raise ValueError(
                     f"Invalid character \"{invalid_character.group()}\" found in this section of the proposed file path: \"{part}\". "
-                    f"Please make sure the file path does not contain any of the following characters: {SharePoint.invalid_characters}"
+                    f"Please make sure the file path does not contain any of the following characters: {OneDrive.invalid_characters}"
                 )
             
             # Check for restricted names

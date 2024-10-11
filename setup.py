@@ -1,21 +1,20 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='path_validator',  # Replace with your package name
-    version='0.1.0',  # Version of your package
-    author='Logan',  # Your name or your organization
-    author_email='your.email@example.com',  # Your email address
-    description='A package for validating file paths across different operating systems',  # A short description of your package
-    long_description=open('README.md').read(),  # Optional: a longer description, e.g., from a README file
-    long_description_content_type='text/markdown',  # Format of the long description
-    url='https://github.com/yourusername/path_validator',  # URL to your package repository
-    packages=find_packages(where='src'),  # Automatically find packages in the src directory
-    package_dir={'': 'src'},  # Tell distutils packages are under src
-    install_requires=open('src/requirements.txt').read().splitlines(),  # Requirements from the requirements.txt
+    name='file-path-validator',
+    version='1.5', 
+    author='Logan',
+    author_email='logan@stax.ai',
+    description='A package for validating file paths across different operating systems',
+    long_description=open('README.md', encoding='utf-8').read(),
+    long_description_content_type='text/markdown',
+    url='https://github.com/Voltaic314/File_Path_Validator',
+    packages=find_packages(),
+    install_requires=open('FPV/requirements.txt').read().splitlines(),
     classifiers=[
         'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: MIT License',  # Specify your license
+        'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
-    python_requires='>=3.6',  # Minimum Python version requirement
+    python_requires='>=3.6',
 )

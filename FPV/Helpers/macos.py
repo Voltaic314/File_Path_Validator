@@ -1,15 +1,12 @@
 import re
-from Helpers._base_service import BaseService
+from FPV.Helpers._base_service import BaseService
 
-class ShareFile(BaseService):
-    # Invalid characters for ShareFile file and folder names
-    invalid_characters = ':;*?"<>~'
+class MacOS(BaseService):
+    # Invalid characters for macOS file and folder names
+    invalid_characters = r'<>:"/\\|?*'
 
     def __init__(self, path: str):
         super().__init__(path)
-        
-        # Store the original path
-        self.original_path = path
         
         # Handle filename and extension
         self.filename = self.path_parts[-1] if self.path_parts else self.path
@@ -24,7 +21,7 @@ class ShareFile(BaseService):
 
     @staticmethod
     def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(ShareFile.invalid_characters)}]")
+        invalid_pattern = re.compile(f"[{re.escape(MacOS.invalid_characters)}]")
         return re.search(invalid_pattern, part)
 
     def check_if_valid(self):
@@ -49,11 +46,11 @@ class ShareFile(BaseService):
                 raise ValueError("File or folder names cannot be empty or just spaces.")
 
             # Check for invalid characters
-            invalid_character = ShareFile.path_part_contains_invalid_characters(part)
+            invalid_character = MacOS.path_part_contains_invalid_characters(part)
             if invalid_character:
                 raise ValueError(
                     f'Invalid character "{invalid_character.group()}" found in "{part}". '
-                    f'Please avoid using: {ShareFile.invalid_characters}'
+                    f'Please avoid using: {MacOS.invalid_characters}'
                 )
 
             # Check for leading or trailing whitespaces

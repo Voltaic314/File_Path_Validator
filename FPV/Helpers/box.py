@@ -1,5 +1,5 @@
 import re
-from Helpers._base_service import BaseService
+from FPV.Helpers._base_service import BaseService
 
 class Box(BaseService):
     # Invalid characters for Box file and folder names

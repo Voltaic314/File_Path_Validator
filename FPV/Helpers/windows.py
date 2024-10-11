@@ -1,8 +1,8 @@
 import re
-from Helpers._base_service import BaseService
+from FPV.Helpers._base_service import BaseService
 
-class MacOS(BaseService):
-    # Invalid characters for macOS file and folder names
+class Windows(BaseService):
+    # Invalid characters for Windows file and folder names
     invalid_characters = r'<>:"/\\|?*'
 
     def __init__(self, path: str):
@@ -21,7 +21,7 @@ class MacOS(BaseService):
 
     @staticmethod
     def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(MacOS.invalid_characters)}]")
+        invalid_pattern = re.compile(f"[{re.escape(Windows.invalid_characters)}]")
         return re.search(invalid_pattern, part)
 
     def check_if_valid(self):
@@ -46,11 +46,11 @@ class MacOS(BaseService):
                 raise ValueError("File or folder names cannot be empty or just spaces.")
 
             # Check for invalid characters
-            invalid_character = MacOS.path_part_contains_invalid_characters(part)
+            invalid_character = Windows.path_part_contains_invalid_characters(part)
             if invalid_character:
                 raise ValueError(
                     f'Invalid character "{invalid_character.group()}" found in "{part}". '
-                    f'Please avoid using: {MacOS.invalid_characters}'
+                    f'Please avoid using: {Windows.invalid_characters}'
                 )
 
             # Check for leading or trailing whitespaces

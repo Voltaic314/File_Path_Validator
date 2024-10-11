@@ -7,16 +7,6 @@ Welcome to **File Path Validator (FPV)**! This Python package provides a robust 
 - **User-Friendly Error Messages**: Easy-to-understand error messages for non-tech-savvy users.
 - **Customizable Validation**: Supports various file name restrictions and length limitations.
 
-## Installation 📦
-
-To install **File Path Validator**, clone the repository and install it using pip:
-
-```bash
-git clone https://github.com/yourusername/File_Path_Validator.git
-cd File_Path_Validator/src
-pip install -e .
-```
-
 Supported Platforms 🖥️
 
 -- Operating Systems --
@@ -31,6 +21,14 @@ Egnyte
 OneDrive
 SharePoint
 ShareFile
+
+## Installation 📦
+
+To install **File Path Validator**, clone the repository and install it using pip:
+
+```bash
+pip install file-path-validator
+```
 
 Usage 📖
 

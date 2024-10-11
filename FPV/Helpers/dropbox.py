@@ -1,5 +1,5 @@
 import re
-from Helpers._base_service import BaseService
+from FPV.Helpers._base_service import BaseService
 
 class Dropbox(BaseService):
     # Invalid characters for Dropbox file and folder names
