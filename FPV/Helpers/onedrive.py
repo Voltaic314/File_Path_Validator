@@ -2,37 +2,19 @@ import re
 from FPV.Helpers._base_service import BaseService
 
 class OneDrive(BaseService):
-    # Invalid characters for OneDrive file and folder names
-    invalid_characters = '<>:"/\\|?*#'
+    # Set maximum path length for OneDrive
+    max_length = 255  # Default for Windows sync, can be overridden if needed
 
     def __init__(self, path: str, windows_sync: bool = True):
-        super().__init__(path)
-        
-        # Store the original path
-        self.original_path = path
-        
-        # Handle filename and extension
-        self.filename = self.path_parts[-1] if self.path_parts else self.path
-        self.filename_ext = self.filename.split('.')[-1]
-
+        super().__init__(path)  # Call the base class constructor
         # Set maximum path length based on the sync option
         self.max_length = 255 if windows_sync else 400
 
-    @staticmethod
-    def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(OneDrive.invalid_characters)}]")
-        return re.search(invalid_pattern, part)
-
     def check_if_valid(self):
-        # Check length limitations
-        if self.path_length > self.max_length:
-            raise ValueError(
-                f"The specified path is too long. "
-                f"Current length: {self.path_length} characters. "
-                f"Maximum allowed length is {self.max_length} characters."
-            )
+        # Call the base class check for path length and general validation
+        super().check_if_valid()  
 
-        # List of restricted names and prefixes
+        # List of restricted names for OneDrive
         RESTRICTED_NAMES = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
             "COM0", "COM1", "COM2", "COM3", "COM4", 
@@ -44,33 +26,30 @@ class OneDrive(BaseService):
         RESTRICTED_PREFIX = "~$"
         RESTRICTED_ROOT_LEVEL_FOLDER = "forms"
 
-        # Check each part of the path
+        # Check each part of the path for OneDrive specific restrictions
         for part in self.path_parts:
             # Check for invalid characters
             invalid_character = OneDrive.path_part_contains_invalid_characters(part)
             if invalid_character:
                 raise ValueError(
-                    f"Invalid character \"{invalid_character.group()}\" found in this section of the proposed file path: \"{part}\". "
-                    f"Please make sure the file path does not contain any of the following characters: {OneDrive.invalid_characters}"
+                    f'Invalid character "{invalid_character.group()}" found in this section of the proposed file path: "{part}". '
+                    f'Please make sure the file path does not contain any of the following characters: {OneDrive.invalid_characters}'
                 )
             
             # Check for restricted names
             if part in RESTRICTED_NAMES:
-                raise ValueError(f"Restricted name found in path: \"{part}\"")
+                raise ValueError(f'Restricted name found in path: "{part}"')
             
             # Check for leading or trailing spaces
             if part != part.strip():
-                raise ValueError(f"Leading or trailing spaces found in path: \"{part}\"")
+                raise ValueError(f'Leading or trailing spaces found in path: "{part}"')
             
             # Check for restricted prefixes
             if part.startswith(RESTRICTED_PREFIX):
-                raise ValueError(f"Restricted prefix found in path: \"{part}\"")
+                raise ValueError(f'Restricted prefix found in path: "{part}"')
             
             # Check for restricted root level folder name
             if part.lower() == RESTRICTED_ROOT_LEVEL_FOLDER and self.path_parts.index(part) == 0:
-                raise ValueError(f"Restricted root level folder name found in path: \"{part}\". Please make sure the first part of the path is not \"{RESTRICTED_ROOT_LEVEL_FOLDER}\"")
-        
+                raise ValueError(f'Restricted root level folder name found in path: "{part}". Please make sure the first part of the path is not "{RESTRICTED_ROOT_LEVEL_FOLDER}"')
+
         return True
-    
-    def get_cleaned_path(self):
-        return '/'.join([s.strip() for s in self.path_parts if s.strip()])

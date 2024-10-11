@@ -3,8 +3,8 @@ from FPV import Validator
 
 
 def main():
-    path = "example/path/with/invalid<>characters"
-    validator = Validator(path, service_name="windows")
+    path = " leading_space/file.txt"
+    validator = Validator(path, service_name="box")
     
     try:
         if validator.check_if_valid():
