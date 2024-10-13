@@ -50,7 +50,7 @@ except ValueError as e:
 
 ## Notes on os_sync
 - The os_sync parameter allows you to specify the operating system for additional validation checks.
-- If not provided, the validator defaults to Windows checks, assuming the user primarily works in that environment.
+- If not provided, the validator will not default to any OS. Because it is possible in a lot of cloud storage systems to only read / write files to their systems without ever syncing up the file storage to an operating system. 
 
 
 ## Contributing 🤝
