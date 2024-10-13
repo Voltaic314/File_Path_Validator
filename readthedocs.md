@@ -18,9 +18,9 @@ Usage
 
 When creating an instance of the Validator, users can specify:
 
-    Path: The file path to be validated.
-    Service Name: The storage service for which the validation is performed (e.g., box, dropbox, onedrive).
-    OS Sync: An optional argument that indicates whether the validation should take into account the operating system's restrictions (e.g., windows, macos, linux). If this argument is provided, the validator will perform additional checks specific to the operating system.
+Path: The file path to be validated.
+Service Name: The storage service for which the validation is performed (e.g., box, dropbox, onedrive).
+OS Sync: An optional argument that indicates whether the validation should take into account the operating system's restrictions (e.g., windows, macos, linux). If this argument is provided, the validator will perform additional checks specific to the operating system.
 
 OS Classes
 
@@ -33,7 +33,8 @@ Methodology for Using os_sync
 
     When to Use os_sync: The os_sync argument is useful when files are intended to be accessed natively within the specified operating system. By specifying this argument, users ensure that all relevant OS restrictions are checked, helping to prevent issues when the file paths are used in their respective file explorers.
 
-    Default Behavior: If os_sync is not provided, the validator assumes that the path is intended for Windows, which is the default behavior. This is useful for users who primarily work in a Windows environment and want a straightforward validation process without needing to specify the OS explicitly.
+    Default Behavior: If not provided, the validator will not default to any OS. Because it is possible in a lot of cloud storage systems to only read / write files to their systems without ever syncing up the file storage to an operating system.
+
 
 Conclusion
 
