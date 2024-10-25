@@ -31,7 +31,7 @@ Each OS class (e.g., Windows, MacOS, Linux) inherits from the base service class
 
 Methodology for Using os_sync
 
-    When to Use os_sync: The os_sync argument is useful when files are intended to be accessed natively within the specified operating system. By specifying this argument, users ensure that all relevant OS restrictions are checked, helping to prevent issues when the file paths are used in their respective file explorers.
+    When to use the os_sync argument: The os_sync argument is useful when files are intended to be accessed natively within the specified operating system. By specifying this argument, users ensure that all relevant OS restrictions are checked, helping to prevent issues when the file paths are used in their respective file explorers.
 
     Default Behavior: If not provided, the validator will not default to any OS. Because it is possible in a lot of cloud storage systems to only read / write files to their systems without ever syncing up the file storage to an operating system.
 

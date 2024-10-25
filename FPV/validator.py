@@ -28,25 +28,31 @@ class Validator:
         "linux": Linux
     }
 
-    def __init__(self, path: str, service_name: str = "windows", os_sync: str = None):
+    def __init__(self, path: str, service_name: str = "windows", os_sync: str = None, **kwargs):
+        self.original_path = path  # Store the original unmodified path
         self.path = path.replace("\\", "/")  # Normalize the path
         self.path = f"/{self.path}" if not self.path.startswith("/") else self.path  # Ensure path starts with a forward slash
-        
+        self.os_sync = os_sync  # Store the OS sync option
+        self.auto_clean = kwargs.get("auto_clean", False)  # Store the auto_clean flag
+
         # Determine if we're using a storage service or an OS service
         if service_name.lower() in self.services:
-            self.service = self.services[service_name.lower()](self.path)  # Instantiate the service provider
+            self.service = self.services[service_name.lower()](self.path, **kwargs)  # Instantiate the service provider
         elif service_name.lower() in self.os_services:
-            self.service = self.os_services[service_name.lower()](self.path)  # Instantiate the OS provider
+            self.service = self.os_services[service_name.lower()](self.path, **kwargs)  # Instantiate the OS provider
         else:
             # Default to Windows service if not found
-            self.service = Windows(self.path)
+            self.service = Windows(self.path, **kwargs)
 
         # If os_sync is provided and not an OS service, instantiate the appropriate OS class
         if os_sync and os_sync.lower() in self.os_services and service_name.lower() not in self.os_services:
             os_service_class = self.os_services[os_sync.lower()]
-            self.os_service = os_service_class(self.path)  # Instantiate the OS class
+            self.os_service = os_service_class(self.path, **kwargs)  # Instantiate the OS class
         else:
             self.os_service = None  # No OS-specific checks
+
+        if self.auto_clean:
+            self.path = self.get_cleaned_path()  # Clean the path if auto_clean is set
 
     def check_if_valid(self):
         # First, validate the storage service
