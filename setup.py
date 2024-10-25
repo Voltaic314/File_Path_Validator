@@ -10,7 +10,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/Voltaic314/File_Path_Validator',
     packages=find_packages(),
-    install_requires=open('FPV/requirements.txt').read().splitlines(),
+    install_requires=open('FPV/requirements.txt', encoding='UTF-8').read().splitlines(),
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
