@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='file-path-validator',
-    version='2.0', 
+    version='2.1', 
     author='Logan',
     author_email='logan@stax.ai',
     description='A package for validating file paths across different operating systems and storage services.',
