@@ -15,6 +15,9 @@ class Windows(BaseService):
         for part in self.path_parts:
             if part.upper() in reserved_names:
                 raise ValueError(f'Reserved name "{part}" is not allowed in Windows.')
+            
+    def get_cleaned_path(self, raise_error: bool = True):
+        cleaned_path = super().get_cleaned_path(raise_error)
 
 
 class MacOS(BaseService):
