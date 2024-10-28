@@ -13,6 +13,7 @@ class BaseService:
         self.path_parts = self.path.strip("/").split('/') if '/' in self.path else [self.path]
         self.filename = self.path_parts[-1]
         self.filename_ext = self.filename.split('.')[-1] if '.' in self.filename else ''
+        self.restricted_names = set()
         
         # Clean the path if the auto_clean flag is set
         if auto_clean:
@@ -110,18 +111,28 @@ class BaseService:
         # Clean the path parts and handle filename normalization here
         cleaned_parts = []
         for part in path_parts:
-            cleaned_part = part.strip().strip(".")  # Strip whitespace from each part and any trailing periods
-            if '.' in cleaned_part:
-                name_part, ext_part = cleaned_part.rsplit('.', 1)
-                cleaned_part = f"{name_part.strip()}.{ext_part.strip()}" if ext_part else name_part.strip()
-            cleaned_parts.append(cleaned_part)
+            if '.' in part:
+                name_part, ext_part = part.rsplit('.', 1)
+                part = f"{name_part.strip()}.{ext_part.strip()}" if ext_part else name_part.strip()
+                        
+            # remove restricted names from the path
+            for restricted_name in self.restricted_names:
+                if restricted_name in part:
+                    part = part.replace(restricted_name, "")
 
-        path = '/'.join([s for s in cleaned_parts if s])  # Join the cleaned parts
-        if not path.startswith("/"):
-            path = "/" + path
+            part = part.strip().rstrip(".")
+            if not part:
+                continue
+            cleaned_parts.append(part)
+
+        output_path = '/'.join([s for s in cleaned_parts if s])  # Join the cleaned parts
+        output_path = output_path.strip("/")
+        output_path = f"/{output_path}" if not output_path.startswith("/") else output_path
+
+        output_path = BaseService.truncate_filepath(output_path, self.max_length)
 
         # Optionally check if the cleaned path is valid
-        cleaned_path_instance = BaseService(path)
+        cleaned_path_instance = BaseService(output_path)
         if raise_error:
             cleaned_path_instance.check_if_valid()
 

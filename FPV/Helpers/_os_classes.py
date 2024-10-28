@@ -7,15 +7,14 @@ class Windows(BaseService):
         super().check_if_valid()  # Calls the base validation logic
 
         # Check for reserved names in Windows
-        reserved_names = {
+        self.RESTRICTED_NAMES = {
             "CON", "PRN", "AUX", "NUL",
             "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
             "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
         }
         for part in self.path_parts:
-            if part.upper() in reserved_names:
+            if part.upper() in self.RESTRICTED_NAMES:
                 raise ValueError(f'Reserved name "{part}" is not allowed in Windows.')
-
 
 class MacOS(BaseService):
     # mac os doesn't have any invalid characters other than 
@@ -27,15 +26,18 @@ class MacOS(BaseService):
         super().check_if_valid()  # Call base validation first
 
         # Check for reserved file names (not explicitly required, but avoid common issues)
-        RESTRICTED_NAMES = {
+        self.RESTRICTED_NAMES = {
             ".DS_Store",
             "._myfile"
         }
 
-        if self.filename in RESTRICTED_NAMES:
+        if self.filename in self.RESTRICTED_NAMES:
             raise ValueError(f'Reserved name "{self.filename}" is not allowed.')
 
         return True
+    
+    def get_cleaned_path(self, raise_error: bool = True):
+        return super().get_cleaned_path(raise_error)
 
 
 class Linux(BaseService):
@@ -47,3 +49,6 @@ class Linux(BaseService):
         # Linux-specific checks can go here if needed
 
         return True
+    
+    def get_cleaned_path(self, raise_error: bool = True):
+        return super().get_cleaned_path(raise_error)

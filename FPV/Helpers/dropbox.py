@@ -13,7 +13,7 @@ class Dropbox(BaseService):
 
         # Specific checks for Dropbox
         # Check for restricted names
-        RESTRICTED_NAMES = {
+        self.RESTRICTED_NAMES = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
             "COM0", "COM1", "COM2", "COM3", "COM4", 
             "COM5", "COM6", "COM7", "COM8", "COM9", 
@@ -22,5 +22,10 @@ class Dropbox(BaseService):
         }
         for part in self.path_parts:
             # Check for restricted names
-            if part in RESTRICTED_NAMES:
+            if part in self.RESTRICTED_NAMES:
                 raise ValueError(f'Restricted name found in path: "{part}"')
+            
+        return True
+    
+    def get_cleaned_path(self, raise_error: bool = True):
+        return super().get_cleaned_path(raise_error)
