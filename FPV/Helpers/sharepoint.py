@@ -47,7 +47,7 @@ class SharePoint(BaseService):
             
             # Check for restricted root level folder name
             if part.lower() == self.RESTRICTED_ROOT_LEVEL_FOLDER and self.path_parts.index(part) == 0:
-                raise ValueError(f'Restricted root level folder name found in path: "{part}". Please make sure the first part of the path is not "{RESTRICTED_ROOT_LEVEL_FOLDER}"')
+                raise ValueError(f'Restricted root level folder name found in path: "{part}". Please make sure the first part of the path is not "{self.RESTRICTED_ROOT_LEVEL_FOLDER}"')
 
         return True
 

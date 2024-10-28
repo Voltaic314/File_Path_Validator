@@ -111,13 +111,13 @@ class BaseService:
         # Clean the path parts and handle filename normalization here
         cleaned_parts = []
         for part in path_parts:
-            if '.' in cleaned_part:
-                name_part, ext_part = cleaned_part.rsplit('.', 1)
-                cleaned_part = f"{name_part.strip()}.{ext_part.strip()}" if ext_part else name_part.strip()
+            if '.' in part:
+                name_part, ext_part = part.rsplit('.', 1)
+                part = f"{name_part.strip()}.{ext_part.strip()}" if ext_part else name_part.strip()
                         
             # remove restricted names from the path
             for restricted_name in self.restricted_names:
-                if restricted_name in cleaned_part:
+                if restricted_name in part:
                     part = part.replace(restricted_name, "")
 
             part = part.strip().rstrip(".")
