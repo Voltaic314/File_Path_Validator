@@ -28,13 +28,6 @@ class OneDrive(BaseService):
 
         # Check each part of the path for OneDrive specific restrictions
         for part in self.path_parts:
-            # Check for invalid characters
-            invalid_character = OneDrive.path_part_contains_invalid_characters(part)
-            if invalid_character:
-                raise ValueError(
-                    f'Invalid character "{invalid_character.group()}" found in this section of the proposed file path: "{part}". '
-                    f'Please make sure the file path does not contain any of the following characters: {OneDrive.invalid_characters}'
-                )
             
             # Check for restricted names
             if part in self.RESTRICTED_NAMES:

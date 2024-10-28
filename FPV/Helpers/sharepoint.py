@@ -66,10 +66,6 @@ class SharePoint(BaseService):
 
             if index == 0:
                 part = part.replace(self.RESTRICTED_ROOT_LEVEL_FOLDER, "")
-            
-            # remove invalid characters
-            for char in self.invalid_characters:
-                part = part.replace(char, "")
                 
             if not part:
                 continue
