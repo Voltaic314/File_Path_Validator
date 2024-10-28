@@ -9,7 +9,6 @@ class ShareFile(BaseService):
     def path_part_contains_invalid_characters(part):
         invalid_pattern = re.compile(f"[{re.escape(ShareFile.invalid_characters)}]")
         return re.search(invalid_pattern, part)
-    
 
     def __init__(self, path: str):
         super().__init__(path)  # Call the base class constructor

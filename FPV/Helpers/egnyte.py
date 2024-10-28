@@ -1,18 +1,13 @@
 from FPV.Helpers._base_service import BaseService
 
 class Egnyte(BaseService):
-    # Set the maximum path length for Egnyte
-    max_length = 5000
-    part_length = 245
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()
+    def __init__(self, path, auto_clean = False):
+        super().__init__(path, auto_clean)
 
-        # Check length of each part
-        for part in self.path_parts:
-            if len(part) > self.part_length:  # Each part's length check for Egnyte
-                raise ValueError(f"Path component exceeds 245 characters: \"{part}\"")
+        # Set the maximum path length for Egnyte
+        self.max_length = 5000
+        self.part_length = 245
 
         # List of restricted names
         self.RESTRICTED_NAMES = {
@@ -28,6 +23,15 @@ class Egnyte(BaseService):
         self.STARTS = ['._', '.~', 'word work file', '_egn_.', '.smbdelete']
         self.STARTS_WITH_TILDE_ENDINGS = ['.idlk', '.xlsx', '.xlsx (deleted)', '.pptx', '.pptx (deleted)']
         self.STARTS_WITH_TILDE_DOLLAR_ENDINGS = ['.doc', '.docx', '.docx (deleted)', '.rtf', '.ppt', '.pptx', '.pptx (deleted)', '.xlsm', '.xlsm (deleted)', '.sldlfp', '.slddrw', '.sldprt', '.sldasm']
+
+    def check_if_valid(self):
+        # Call the base class check for path length and general validation
+        super().check_if_valid()
+
+        # Check length of each part
+        for part in self.path_parts:
+            if len(part) > self.part_length:  # Each part's length check for Egnyte
+                raise ValueError(f"Path component exceeds 245 characters: \"{part}\"")
         
         # Check for restricted names and additional rules
         for part in self.path_parts:

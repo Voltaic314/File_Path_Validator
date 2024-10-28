@@ -7,10 +7,6 @@ class Dropbox(BaseService):
     def __init__(self, path: str):
         super().__init__(path)  # Call the base class constructor
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()  
-
         # Specific checks for Dropbox
         # Check for restricted names
         self.RESTRICTED_NAMES = {
@@ -20,6 +16,11 @@ class Dropbox(BaseService):
             "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", 
             "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
         }
+
+    def check_if_valid(self):
+        # Call the base class check for path length and general validation
+        super().check_if_valid()  
+
         for part in self.path_parts:
             # Check for restricted names
             if part in self.RESTRICTED_NAMES:

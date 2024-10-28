@@ -11,10 +11,6 @@ class SharePoint(BaseService):
         # Set maximum path length based on the sync option
         self.max_length = 255 if windows_sync else 400
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()  
-
         # List of restricted names for SharePoint
         self.RESTRICTED_NAMES = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
@@ -26,6 +22,12 @@ class SharePoint(BaseService):
         }
         self.RESTRICTED_PREFIX = "~$"
         self.RESTRICTED_ROOT_LEVEL_FOLDER = "forms"
+
+
+
+    def check_if_valid(self):
+        # Call the base class check for path length and general validation
+        super().check_if_valid()  
 
         # Check each part of the path
         for part in self.path_parts:
