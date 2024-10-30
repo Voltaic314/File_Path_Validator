@@ -1,140 +1,161 @@
 import re
 
+
 class BaseService:
+    """Base class for path validation and cleaning."""
     # Default invalid characters
-    invalid_characters = '<>:"|?*'
-    max_length = 255  # Default maximum length
+    invalid_characters = ''
+    max_length = 0  # Default maximum length
+
+    corresponding_validate_and_clean_methods  = {
+        "path_length": {"validate": "validate_path_length", "clean": "truncate_path"},
+        "restricted_names": {"validate": "validate_restricted_names", "clean": "remove_restricted_names"},
+        "part_ends_with_period": {"validate": "validate_if_part_ends_with_period", "clean": "remove_trailing_periods"},
+        "whitespace_around_parts": {"validate": "validate_if_whitespace_around_parts", "clean": "remove_whitespace_around_parts"},
+        "empty_parts": {"validate": "validate_empty_parts", "clean": "remove_empty_parts"},
+        "_main": {"validate": "validate", "clean": "clean"}
+    }
 
     def __init__(self, path: str, auto_clean: bool = False):
-        self.original_path = path  # Store the original unmodified path
+        self.original_path = path
         self.path = path.replace("\\", "/")
         self.path = f"/{self.path}" if not self.path.startswith("/") else self.path
-        self.path_length = len(self.path)
         self.path_parts = self.path.strip("/").split('/') if '/' in self.path else [self.path]
-        self.filename = self.path_parts[-1]
-        self.filename_ext = self.filename.split('.')[-1] if '.' in self.filename else ''
         self.restricted_names = set()
-        
-        # Clean the path if the auto_clean flag is set
+
         if auto_clean:
-            self.path = self.get_cleaned_path()
+            self.path = self.clean()
+
+    def get_validate_or_clean_method(self, method: str, action: str, **kwargs):
+        """
+        The purpose of this method is to return the appropriate 
+        validate or clean method based on the method and action passed.
+        If you pass in "clean" as your action argument then you need to also pass in the "path" argument.
+
+        Args:
+            method (str): The name of the validate/clean method pair to use.
+            action (str): The action to perform, either "validate" or "clean".
+            **kwargs: Additional keyword arguments to pass to the method.
+
+        Returns:
+        if action == "validate":
+            bool: The result of the validation.
+        elif action == "clean":
+            str: The cleaned path.
+        """
+        return getattr(self, self.corresponding_validate_and_clean_methods[method][action], **kwargs)
     
-    @staticmethod
-    def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(BaseService.invalid_characters)}]")
+    def clean_and_validate_path(self, method: str, raise_error: bool = True, **kwargs):
+        """
+        Clean the path with the specified clean method, then optionally validate.
+        
+        Args:
+            method (str): The name of the validate/clean method pair to use.
+            raise_error (bool): Whether to raise an error if the cleaned path is still invalid.
+
+        Returns:
+            str: The cleaned path.
+        """
+        # Call the clean method
+        clean_method = self.get_validate_or_clean_method(method, "clean")
+        cleaned_path = clean_method(self.path, **kwargs)
+
+        # If raise_error is set, validate the cleaned path
+        if raise_error:
+            # Create a new instance of the current class with the cleaned path
+            cleaned_instance = self.__class__(cleaned_path, **kwargs)
+            validate_method = self.get_validate_or_clean_method(method, "validate")
+            validate_method(cleaned_instance)  # Call the validate method on the new instance
+
+        return cleaned_path
+
+    def path_part_contains_invalid_characters(self, part):
+        invalid_pattern = re.compile(f"[{re.escape(self.invalid_characters)}]")
         return re.search(invalid_pattern, part)
 
-    def check_path_length(self):
-        """Check if the path length exceeds the maximum allowed."""
-        if self.path_length > self.max_length:
-            raise ValueError(
-                f"The specified path is too long. "
-                f"Current length: {self.path_length} characters. "
-                f"Maximum allowed length is {self.max_length} characters."
-            )
-    def check_invalid_character(self, part):
-        """Check for invalid characters in a part."""
-        invalid_character = self.path_part_contains_invalid_characters(part)
-        if invalid_character:
-            raise ValueError(
-                f'Invalid character "{invalid_character.group()}" found in: "{part}". '
-                f'Please avoid using: {self.invalid_characters}'
-            )
+    def validate_invalid_characters(self):
+        """validate for invalid characters in each part of the path."""
+        for part in self.path_parts:
+            if self.path_part_contains_invalid_characters(part):
+                raise ValueError(f'Invalid characters found in part: "{part}".')
 
-    def check_leading_trailing_spaces(self, part):
-        """Check for leading or trailing spaces in a part."""
-        if part != part.strip():
-            raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
-
-    def check_if_valid_folder(self, part):
-        """Perform folder-specific checks."""
-        self.check_invalid_character(part)
-        self.check_leading_trailing_spaces(part)
-        if part.endswith("."):
-            raise ValueError(f'Folder names cannot end with a period: "{part}".')
-
-    def check_if_valid_filename(self, filename):
-        """Perform filename-specific checks."""
-        if '.' not in filename:
-            raise ValueError(f'Filename "{filename}" must contain an extension.')
-        self.check_leading_trailing_spaces(filename)
-        self.check_invalid_character(filename)
-
-    # strict validation checking by default. 
-    # if you want to check only the cleaned path, set clean_only=True :) 
-    def check_if_valid(self, clean_only: bool = False):
-        """Validate the path parts, with an option to check only the cleaned path."""
-        if clean_only:
-            # Validate based on cleaned path
-            cleaned_path = self.get_cleaned_path()
-            if len(cleaned_path) > self.max_length:
-                raise ValueError(
-                    f"Cleaned path is too long. Current length: {len(cleaned_path)} characters. "
-                    f"Maximum allowed length is {self.max_length} characters."
-                )
-            for part in cleaned_path.strip("/").split('/'):
-                self.check_if_valid_folder(part)  # Validate each part of the cleaned path
-        else:
-            self.check_path_length()  # Use the overridden value if in a subclass
-            for idx, part in enumerate(self.path_parts):
-                if idx < len(self.path_parts) - 1:  # All but the last part are folders
-                    self.check_if_valid_folder(part)
-                else:  # Last part is the filename
-                    self.check_if_valid_filename(part)
-
-        return True
-    
-    @staticmethod
-    def truncate_filepath(path: str, max_length: int = 255):
-        path_length = len(path)
-        if path_length <= max_length:
-            return path
-        path_parts = path.strip("/").split('/') if '/' in path else [path]
-        filename = path_parts[-1]
-        path_up_to_filename = '/'.join(path_parts[:-1])
-        filename_length = len(filename)
-        if path_length <= max_length:
-            return path
-        path_up_to_filename = '/'.join(path_parts[:-1])
-        filename_length = len(filename)
-        num_of_chars_we_can_use = max_length - (filename_length + 1)
-        if num_of_chars_we_can_use < 0:
-            raise ValueError(f"Filename is too long to fit in the path: {filename}")
-        truncated_path = f"{path_up_to_filename[:num_of_chars_we_can_use]}/{filename}"
-        return truncated_path
-
-    def get_cleaned_path(self, raise_error: bool = True):
-        """Clean the path and return the cleaned path."""
-        path = self.path
-        path = ''.join([char for char in path if char not in self.invalid_characters])  # Remove invalid characters
-        path_parts = path.strip("/").split('/') if '/' in path else [path]
-        # Clean the path parts and handle filename normalization here
+    def remove_invalid_characters(self, path):
+        """Remove invalid characters from each part of the path and return the cleaned path."""
         cleaned_parts = []
-        for part in path_parts:
-            if '.' in part:
-                name_part, ext_part = part.rsplit('.', 1)
-                part = f"{name_part.strip()}.{ext_part.strip()}" if ext_part else name_part.strip()
-                        
-            # remove restricted names from the path
-            for restricted_name in self.restricted_names:
-                if restricted_name in part:
-                    part = part.replace(restricted_name, "")
+        for part in path.strip("/").split('/'):
+            cleaned_part = re.sub(f"[{re.escape(self.invalid_characters)}]", "", part)
+            if cleaned_part:  # Only add non-empty parts
+                cleaned_parts.append(cleaned_part)
+        return "/".join(cleaned_parts)
 
-            part = part.strip().rstrip(".")
-            if not part:
-                continue
-            cleaned_parts.append(part)
+    def validate_path_length(self):
+        """validate if the path length exceeds the maximum allowed."""
+        if self.max_length and len(self.path) > self.max_length:
+            raise ValueError(f"The specified path is too long. Maximum allowed is {self.max_length} characters.")
 
-        output_path = '/'.join([s for s in cleaned_parts if s])  # Join the cleaned parts
-        output_path = output_path.strip("/")
-        output_path = f"/{output_path}" if not output_path.startswith("/") else output_path
+    def truncate_path(self, path):
+        """Truncate the path length to meet the maximum length requirement."""
+        if len(path) <= self.max_length:
+            return path
+        
+        # Use as much of the filename as possible but raise if the filename alone exceeds max length
+        filename = path.split('/')[-1]
+        filename_length = len(filename)
+        if filename_length > self.max_length:
+            raise ValueError(f"The filename is too long. Maximum allowed is {self.max_length} characters.")
 
-        output_path = BaseService.truncate_filepath(output_path, self.max_length)
+        # Calculate maximum usable path length minus filename
+        max_path_length = self.max_length - filename_length - 1
+        truncated_path = path[:max_path_length]
+        
+        return f"{truncated_path}/{filename}"
 
-        # Optionally check if the cleaned path is valid
-        cleaned_path_instance = BaseService(output_path)
-        if raise_error:
-            cleaned_path_instance.check_if_valid()
 
-        return cleaned_path_instance.path
+    def validate_restricted_names(self):
+        """validate for restricted names in each part of the path."""
+        for part in self.path_parts:
+            if part in self.restricted_names:
+                raise ValueError(f'Restricted name "{part}" found in path.')
 
+    def remove_restricted_names(self, path):
+        """Remove restricted names from each part of the path and return the cleaned path."""
+        cleaned_parts = [part for part in path.strip("/").split('/') if part not in self.restricted_names]
+        return "/".join(cleaned_parts)
+
+    def validate_if_part_ends_with_period(self):
+        """validate if any part of the path ends with a period."""
+        for part in self.path_parts:
+            if part.endswith('.'):
+                raise ValueError(f'"{part}" cannot end with a period.')
+
+    def remove_trailing_periods(self, path):
+        """Remove trailing periods from each part of the path and return the cleaned path."""
+        cleaned_parts = [part.rstrip('.') for part in path.strip("/").split('/') if part.rstrip('.')]
+        return "/".join(cleaned_parts)
+
+    def validate_if_whitespace_around_parts(self):
+        """validate if there are leading or trailing spaces in any part of the path."""
+        for part in self.path_parts:
+            if part != part.strip():
+                raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
+
+    def remove_whitespace_around_parts(self, path):
+        """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
+        cleaned_parts = [part.strip() for part in path.strip("/").split('/') if part.strip()]
+        return "/".join(cleaned_parts)
+
+    def validate_empty_parts(self):
+        """validate for empty parts in the path."""
+        if '' in self.path_parts:
+            raise ValueError('Empty parts are not allowed in the path.')
+
+    def remove_empty_parts(self, path):
+        """Remove any empty parts in the path and return the cleaned path."""
+        cleaned_parts = [part for part in path.strip("/").split('/') if part]
+        return "/".join(cleaned_parts)
+
+    def validate(self):
+        pass
+
+    def clean(self):
+        pass
