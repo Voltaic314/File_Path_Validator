@@ -2,84 +2,86 @@ import re
 from FPV.Helpers._base_service import BaseService
 
 class SharePoint(BaseService):
-    # Invalid characters for SharePoint file and folder names
+    # Invalid characters specific to SharePoint, adding "#" to the base invalid characters
     invalid_characters = BaseService.invalid_characters + "#"
-    
-    def __init__(self, path: str, windows_sync: bool = True):
-        super().__init__(path)  # Call the base class constructor
 
-        # Set maximum path length based on the sync option
-        self.max_length = 255 if windows_sync else 400
+    def __init__(self, path: str, auto_clean=False, relative=True):
+        super().__init__(path, auto_clean=auto_clean, relative=relative)
 
-        # List of restricted names for SharePoint
-        self.RESTRICTED_NAMES = {
-            ".lock", "CON", "PRN", "AUX", "NUL", 
-            "COM0", "COM1", "COM2", "COM3", "COM4", 
-            "COM5", "COM6", "COM7", "COM8", "COM9", 
-            "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", 
-            "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", 
-            "_vti_", "desktop.ini"
+        # SharePoint-specific restricted names, prefixes, and root folder
+        self.max_length = 400
+        self.restricted_names = {
+            ".lock", "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", 
+            "COM6", "COM7", "COM8", "COM9", "LPT1", 
+            "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
+            "LPT7", "LPT8", "LPT9", "_vti_", "desktop.ini"
         }
-        self.RESTRICTED_PREFIX = "~$"
-        self.RESTRICTED_ROOT_LEVEL_FOLDER = "forms"
+        self.restricted_prefix = "~$"
+        self.restricted_root_folder = "forms"
 
+        self.corresponding_validate_and_clean_methods.update(
+            {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"}},
+            
+        )
+    
+    def validate(self):
+        """Validate the full path for SharePoint, including SharePoint-specific validations."""
+        self.validate_path_length()
+        self.validate_invalid_characters()
+        self.validate_restricted_names()
 
-
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()  
-
-        # Check each part of the path
+        # Apply SharePoint-specific checks on each part
         for part in self.path_parts:
-            # Check for invalid characters
-            invalid_character = SharePoint.path_part_contains_invalid_characters(part)
-            if invalid_character:
-                raise ValueError(
-                    f'Invalid character "{invalid_character.group()}" found in this section of the proposed file path: "{part}". '
-                    f'Please make sure the file path does not contain any of the following characters: {SharePoint.invalid_characters}'
-                )
-            
-            # Check for restricted names
-            if part in self.RESTRICTED_NAMES:
-                raise ValueError(f'Restricted name found in path: "{part}"')
-            
-            # Check for restricted prefixes
-            if part.startswith(self.RESTRICTED_PREFIX):
-                raise ValueError(f'Restricted prefix found in path: "{part}"')
-            
-            # Check for restricted root level folder name
-            if part.lower() == self.RESTRICTED_ROOT_LEVEL_FOLDER and self.path_parts.index(part) == 0:
-                raise ValueError(f'Restricted root level folder name found in path: "{part}". Please make sure the first part of the path is not "{self.RESTRICTED_ROOT_LEVEL_FOLDER}"')
-
-        return True
-
-    def get_cleaned_path(self, raise_error: bool = True):
-        cleaned_path = super().get_cleaned_path(raise_error)
+            self.validate_if_part_ends_with_period(part)
+            self.validate_if_whitespace_around_parts(part)
+            self.validate_restricted_prefix(part)
+            self.validate_restricted_root_folder(part)
         
+        self.validate_empty_parts()
+
+    def clean(self, raise_error=True):
+        """Clean and return a SharePoint-compliant path; validate if raise_error is True."""
+        cleaned_path = self.path
+        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+
+        # Remove restricted prefixes and handle root folder restrictions
         cleaned_path_parts = []
         for index, part in enumerate(cleaned_path.split("/")):
-
-            for restricted_name in self.RESTRICTED_NAMES:
-                part = part.replace(restricted_name, "")
-
-            part = part.replace(self.RESTRICTED_PREFIX, "")
-
-            part = part.strip().rstrip(".")
-
+            part = self.remove_restricted_prefix(part)
             if index == 0:
-                part = part.replace(self.RESTRICTED_ROOT_LEVEL_FOLDER, "")
-                
-            if not part:
-                continue
-            
-            cleaned_path_parts.append(part)
+                part = self.remove_restricted_root_folder(part)
+            part = part.strip().rstrip(".")
+            if part:
+                cleaned_path_parts.append(part)
         
-        output_path = '/'.join(cleaned_path_parts)
-        output_path = output_path.strip('/')
-        output_path = f'{"/" + output_path}' if not output_path.startswith("/") else output_path
+        cleaned_path = "/".join(cleaned_path_parts).strip("/")
+        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
 
-        cleaned_path_instance = SharePoint(output_path)
+        # Revalidate if needed
         if raise_error:
-            cleaned_path_instance.check_if_valid()
-        
-        return cleaned_path_instance.path
+            cleaned_path_instance = SharePoint(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance.validate()
+
+        return cleaned_path
+
+    # SharePoint-specific helper methods
+    def validate_restricted_prefix(self, part):
+        """Validate that a part of the path does not start with the restricted prefix."""
+        if part.startswith(self.restricted_prefix):
+            raise ValueError(f'Restricted prefix "{self.restricted_prefix}" found in path part: "{part}"')
+
+    def validate_restricted_root_folder(self, part):
+        """Validate that the first part of the path is not the restricted root folder."""
+        if part.lower() == self.restricted_root_folder and self.path_parts.index(part) == 0:
+            raise ValueError(f'Restricted root folder "{self.restricted_root_folder}" found at path root: "{part}"')
+
+    def remove_restricted_prefix(self, part):
+        """Remove the restricted prefix from a path part if present."""
+        return part[len(self.restricted_prefix):] if part.startswith(self.restricted_prefix) else part
+
+    def remove_restricted_root_folder(self, part):
+        """Remove the restricted root folder name if it is the first part of the path."""
+        return "" if part.lower() == self.restricted_root_folder else part

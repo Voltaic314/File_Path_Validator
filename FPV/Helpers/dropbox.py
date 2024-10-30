@@ -1,32 +1,47 @@
 from FPV.Helpers._base_service import BaseService
 
+
 class Dropbox(BaseService):
     # Dropbox has a maximum path length of 260 characters
+    invalid_characters = '<>:"|?*.'
     max_length = 260
 
-    def __init__(self, path: str):
-        super().__init__(path)  # Call the base class constructor
-
-        # Specific checks for Dropbox
-        # Check for restricted names
-        self.RESTRICTED_NAMES = {
-            ".lock", "CON", "PRN", "AUX", "NUL", 
-            "COM0", "COM1", "COM2", "COM3", "COM4", 
-            "COM5", "COM6", "COM7", "COM8", "COM9", 
-            "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", 
-            "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    def __init__(self, path: str, auto_clean=False):
+        super().__init__(path, auto_clean=auto_clean)
+        
+        # Define restricted names specific to Dropbox
+        self.restricted_names = {
+            ".lock", "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", 
+            "COM6", "COM7", "COM8", "COM9", "LPT1", 
+            "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
+            "LPT7", "LPT8", "LPT9"
         }
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()  
+    def validate(self):
+        """Validate the full path for Dropbox, including Dropbox-specific validations."""
+        self.validate_path_length()
+        self.validate_invalid_characters()
+        self.validate_restricted_names()
 
+        # Ensure each part has no leading/trailing spaces
         for part in self.path_parts:
-            # Check for restricted names
-            if part in self.RESTRICTED_NAMES:
-                raise ValueError(f'Restricted name found in path: "{part}"')
-            
-        return True
-    
-    def get_cleaned_path(self, raise_error: bool = True):
-        return super().get_cleaned_path(raise_error)
+            self.validate_if_whitespace_around_parts(part)
+        
+        self.validate_empty_parts()
+
+    def clean(self, raise_error=True):
+        """Clean and return a Dropbox-compliant path; validate if raise_error is True."""
+        cleaned_path = self.path
+        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.remove_whitespace_around_parts(cleaned_path)
+        cleaned_path = self.remove_empty_parts(cleaned_path)
+
+        # Revalidate if needed
+        if raise_error:
+            cleaned_path_instance = Dropbox(cleaned_path)
+            cleaned_path_instance.validate()
+
+        return cleaned_path

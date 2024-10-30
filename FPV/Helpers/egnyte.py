@@ -1,114 +1,148 @@
+import re
 from FPV.Helpers._base_service import BaseService
 
+
 class Egnyte(BaseService):
+    # Egnyte-specific character restrictions
+    invalid_characters = ':*?"<>|'
 
-    def __init__(self, path, auto_clean = False):
-        super().__init__(path, auto_clean)
+    def __init__(self, path, auto_clean=False, relative=True):
+        super().__init__(path, auto_clean=auto_clean, relative=relative)
 
-        # Set the maximum path length for Egnyte
+        # Path length limits
         self.max_length = 5000
         self.part_length = 245
 
-        # List of restricted names
-        self.RESTRICTED_NAMES = {
-            ".ds_store", 
-            ".metadata_never_index", 
-            ".thumbs.db", 
-            "powerpoint temp", 
-            "desktop.ini", 
+        # Specific restricted names, suffixes, prefixes
+        self.restricted_names = {
+            ".ds_store", ".metadata_never_index", ".thumbs.db", 
+            "powerpoint temp", "desktop.ini", "icon\r", ".data", ".tmp"
         }
+        self.endings = [
+            ".", "~", "._attribs_", "._rights_", "._egn_", "_egnmeta", 
+            ".tmp", "-spotlight", ".ac$", ".sv$", ".~vsdx"
+        ]
+        self.starts = ["._", ".~", "word work file", "_egn_.", ".smbdelete", ".spotlight-"]
+        self.starts_with_tilde_endings = [".idlk", ".xlsx", ".pptx"]
+        self.starts_with_tilde_dollar_endings = [
+            ".doc", ".docx", ".rtf", ".ppt", ".pptx", 
+            ".xlsm", ".sldlfp", ".slddrw", ".sldprt", ".sldasm"
+        ]
+        self.temp_patterns = [
+            r"^atmp\d{4}$",  # AutoCAD temp files, e.g., "atmp3829"
+            r"^.+\.sas\.b\d{2}$",  # SAS temp files, e.g., "myFile.sas.b73"
+            r"^aa[a-zA-Z]\d{5}$",  # PDF temp files, e.g., "aau38221"
+            r"^.+\.\$\$\$$"  # Files ending in .$$$, e.g., "myFile.$$$"
+        ]
 
-        # List of endings, starts, and other special checks
-        self.ENDINGS = ['~', '._attribs_', '._rights_', '._egn_', '_egnmeta', '.tmp', '-spotlight', '.ac$', '.sv$', '.~vsdx']
-        self.STARTS = ['._', '.~', 'word work file', '_egn_.', '.smbdelete']
-        self.STARTS_WITH_TILDE_ENDINGS = ['.idlk', '.xlsx', '.xlsx (deleted)', '.pptx', '.pptx (deleted)']
-        self.STARTS_WITH_TILDE_DOLLAR_ENDINGS = ['.doc', '.docx', '.docx (deleted)', '.rtf', '.ppt', '.pptx', '.pptx (deleted)', '.xlsm', '.xlsm (deleted)', '.sldlfp', '.slddrw', '.sldprt', '.sldasm']
+        self.corresponding_validate_and_clean_methods.update(
+            {"part_length": {"validate": "validate_part_length", "clean": "remove_restricted_suffixes"}},
+            {"suffixes": {"validate": "validate_suffixes", "clean": "remove_restricted_suffixes"}},
+            {"prefixes": {"validate": "validate_prefixes", "clean": "remove_restricted_prefixes"}},
+            {"temp_patterns": {"validate": "validate_temp_patterns", "clean": "remove_temp_patterns"}}
+        )
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()
+    def validate(self):
+        """Validate the path according to Egnyte-specific rules."""
+        self.validate_path_length()
+        self.validate_part_length()
+        self.validate_restricted_names()
 
-        # Check length of each part
         for part in self.path_parts:
-            if len(part) > self.part_length:  # Each part's length check for Egnyte
-                raise ValueError(f"Path component exceeds 245 characters: \"{part}\"")
+            self.validate_if_whitespace_around_parts(part)
+            self.validate_suffixes(part)
+            self.validate_prefixes(part)
+            self.validate_temp_patterns(part)
         
-        # Check for restricted names and additional rules
-        for part in self.path_parts:
-            # Check for restricted names
-            if part.lower() in self.RESTRICTED_NAMES:
-                raise ValueError(f"Restricted name found in path: \"{part}\"")
-            
-            # Check for names ending with restricted suffixes
-            for ending in self.ENDINGS:
-                if part.lower().endswith(ending):
-                    raise ValueError(f"Name ends with restricted suffix \"{ending}\": \"{part}\"")
+        self.validate_empty_parts()
 
-            # Check for names starting with restricted prefixes
-            for start in self.STARTS:
-                if part.lower().startswith(start):
-                    raise ValueError(f"Name starts with restricted prefix \"{start}\": \"{part}\"")
-                    
-            # Check for names starting with '~' and ending with certain extensions
-            if part.startswith('~'):
-                for ending in self.STARTS_WITH_TILDE_ENDINGS:
-                    if part.endswith(ending):
-                        raise ValueError(f"Name starts with '~' and ends with \"{ending}\": \"{part}\"")
+    def clean(self, raise_error=True):
+        """Clean and return an Egnyte-compliant path; validate if raise_error is True."""
+        cleaned_path = self.path
+        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("part_length", raise_error=raise_error)
 
-            # Check for names starting with '~$' and ending with certain extensions
-            if part.startswith('~$'):
-                for ending in self.STARTS_WITH_TILDE_DOLLAR_ENDINGS:
-                    if part.endswith(ending):
-                        raise ValueError(f"Name starts with '~$' and ends with \"{ending}\": \"{part}\"")
-
-        return True
-    
-    def get_cleaned_path(self, raise_error: bool = True):
-        cleaned_path = super().get_cleaned_path()
-        # Additional cleaning for Egnyte
         cleaned_path_parts = []
         for part in cleaned_path.split('/'):
-
-            # Remove restricted names
-            for restricted_name in self.RESTRICTED_NAMES:
-                if restricted_name in part.lower():
-                    part = part.replace(restricted_name, '')
-
-            # Remove endings
-            for ending in self.ENDINGS:
-                if part.lower().endswith(ending):
-                    part = part.replace(ending, '')
-            
-            # Remove starts
-            for start in self.STARTS:
-                part = part.replace(start, '')
-            
-            # Remove '~' and certain endings
-            if part.startswith('~'):
-                for ending in self.STARTS_WITH_TILDE_ENDINGS:
-                    part = part.replace(ending, '')
-            
-            # Remove '~$' and certain endings
-            if part.startswith('~$'):
-                for ending in self.STARTS_WITH_TILDE_DOLLAR_ENDINGS:
-                    part = part.replace(ending, '')
-
+            part = self.remove_restricted_suffixes(part)
+            part = self.remove_restricted_prefixes(part)
+            part = self.remove_temp_patterns(part)
             part = part.strip().rstrip(".")
-            
-            # lmao if there is anything left after all that hahaha...
+
             if part:
                 cleaned_path_parts.append(part)
-        
-        output_path = '/'.join(cleaned_path_parts)
-        output_path = output_path.strip('/')
-        output_path = f'{"/" + output_path}' if not output_path.startswith("/") else output_path
-        
-        # Optionally check if the cleaned path is valid
-        cleaned_path_instance = Egnyte(output_path)
-        # this helps ensure no surprises. So that way if the supposed clean path is invalid... 
-        # we can catch it here and not later on when we're trying to use it. You're welcome. :)
-        if raise_error:
-            cleaned_path_instance.check_if_valid()
 
-        return cleaned_path_instance.path
-            
+        cleaned_path = '/'.join(cleaned_path_parts).strip('/')
+        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
+
+        # Validate cleaned path if needed
+        if raise_error:
+            cleaned_path_instance = Egnyte(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance.validate()
+
+        return cleaned_path
+
+    # Egnyte-specific helper methods
+    def validate_part_length(self):
+        """Validate each part's length for Egnyte (max 245 characters)."""
+        for part in self.path_parts:
+            if len(part) > self.part_length:
+                raise ValueError(f"Path component exceeds 245 characters: '{part}'")
+
+    def validate_suffixes(self, part):
+        """Validate that no part ends with restricted Egnyte suffixes."""
+        for suffix in self.endings:
+            if part.lower().endswith(suffix):
+                raise ValueError(f"Path component '{part}' has restricted suffix: '{suffix}'")
+
+    def validate_prefixes(self, part):
+        """Validate that no part starts with restricted Egnyte prefixes."""
+        for prefix in self.starts:
+            if part.lower().startswith(prefix):
+                raise ValueError(f"Path component '{part}' has restricted prefix: '{prefix}'")
+
+        # Additional checks for '~' and '~$' prefixes
+        if part.startswith("~"):
+            for ending in self.starts_with_tilde_endings:
+                if part.endswith(ending):
+                    raise ValueError(f"Path component '{part}' starts with '~' and ends with '{ending}'")
+        if part.startswith("~$"):
+            for ending in self.starts_with_tilde_dollar_endings:
+                if part.endswith(ending):
+                    raise ValueError(f"Path component '{part}' starts with '~$' and ends with '{ending}'")
+
+    def validate_temp_patterns(self, part):
+        """Validate against specific temporary file patterns unique to Egnyte."""
+        for pattern in self.temp_patterns:
+            if re.match(pattern, part.lower()):
+                raise ValueError(f"Path component '{part}' matches restricted temporary file pattern.")
+
+    def remove_restricted_suffixes(self, part):
+        """Remove restricted Egnyte suffixes from a path part."""
+        for suffix in self.endings:
+            if part.lower().endswith(suffix):
+                part = part[: -len(suffix)]
+        return part
+
+    def remove_restricted_prefixes(self, part):
+        """Remove restricted Egnyte prefixes from a path part."""
+        for prefix in self.starts:
+            if part.lower().startswith(prefix):
+                part = part[len(prefix):]
+        if part.startswith("~"):
+            for ending in self.starts_with_tilde_endings:
+                if part.endswith(ending):
+                    part = part[1:]
+        if part.startswith("~$"):
+            for ending in self.starts_with_tilde_dollar_endings:
+                if part.endswith(ending):
+                    part = part[2:]
+        return part
+
+    def remove_temp_patterns(self, part):
+        """Remove components matching Egnyte's restricted temporary file patterns."""
+        for pattern in self.temp_patterns:
+            if re.match(pattern, part.lower()):
+                return ""  # Remove the whole part if it matches a temp pattern
+        return part

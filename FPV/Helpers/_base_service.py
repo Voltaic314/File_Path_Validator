@@ -21,6 +21,7 @@ class BaseService:
         self.path = path.replace("\\", "/")
         self.path = f"/{self.path}" if not self.path.startswith("/") else self.path
         self.path_parts = self.path.strip("/").split('/') if '/' in self.path else [self.path]
+        self.path_parts = [part for part in self.path_parts if part]  # Remove empty parts
         self.restricted_names = set()
 
         if auto_clean:

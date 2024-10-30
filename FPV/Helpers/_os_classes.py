@@ -8,6 +8,9 @@ class Windows(BaseService):
 
     def __init__(self, path, auto_clean=False, relative=True):
         super().__init__(path, auto_clean=auto_clean, relative=relative)
+        if not relative:
+            if self.path.startswith("/"):
+                self.path = self.path[1:] # this should fix any weird "/C:/" paths due to the base formatting it does :) 
         self.restricted_names = {
             "CON", "PRN", "AUX", "NUL",
             "COM1", "COM2", "COM3", "COM4", "COM5", 
@@ -91,8 +94,8 @@ class Linux(BaseService):
     def __init__(self, path, auto_clean=False):
         super().__init__(path, auto_clean)
         
-        self.corresponding_validate_and_clean_methods.append(
-            {"validate": "validate_null_character", "clean": "clean_null_character"}
+        self.corresponding_validate_and_clean_methods.update(
+            {"null_character": {"validate": "validate_null_character", "clean": "clean_null_character"}}
         )
 
     def validate_null_character(self):
