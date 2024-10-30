@@ -29,8 +29,8 @@ class Box(BaseService):
     def clean(self, raise_error=True):
         """Clean and return a Box-compliant path, validating if raise_error is True."""
         cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
 
         # Clean each part for whitespace and restricted characters
         cleaned_path_parts = []

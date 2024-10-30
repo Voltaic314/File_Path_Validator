@@ -29,18 +29,17 @@ class Windows(BaseService):
         self.validate_restricted_names()
         
         # Validate each part does not end with a period and has no leading/trailing spaces
-        for part in self.path_parts:
-            self.validate_if_part_ends_with_period(part)
-            self.validate_if_whitespace_around_parts(part)
+        self.validate_if_part_ends_with_period()
+        self.validate_if_whitespace_around_parts()
 
         self.validate_empty_parts()
 
     def clean(self, raise_error=True):
         """Clean and return the Windows-compliant path, and validate if raise_error is True."""
         cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
         
         # Remove trailing periods and spaces
         for part in self.path_parts:

@@ -21,8 +21,9 @@ class SharePoint(BaseService):
         self.restricted_root_folder = "forms"
 
         self.corresponding_validate_and_clean_methods.update(
-            {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"}},
-            
+            {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"},
+             "restricted_root_folder": {"validate": "validate_restricted_root_folder", "clean": "remove_restricted_root_folder"},
+            }
         )
     
     def validate(self):
@@ -30,11 +31,11 @@ class SharePoint(BaseService):
         self.validate_path_length()
         self.validate_invalid_characters()
         self.validate_restricted_names()
+        self.validate_if_part_ends_with_period()
+        self.validate_if_whitespace_around_parts()
 
         # Apply SharePoint-specific checks on each part
         for part in self.path_parts:
-            self.validate_if_part_ends_with_period(part)
-            self.validate_if_whitespace_around_parts(part)
             self.validate_restricted_prefix(part)
             self.validate_restricted_root_folder(part)
         
@@ -43,9 +44,9 @@ class SharePoint(BaseService):
     def clean(self, raise_error=True):
         """Clean and return a SharePoint-compliant path; validate if raise_error is True."""
         cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
 
         # Remove restricted prefixes and handle root folder restrictions
         cleaned_path_parts = []

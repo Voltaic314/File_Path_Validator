@@ -52,19 +52,19 @@ class Validator:
             self.os_service = None  # No OS-specific checks
 
         if self.auto_clean:
-            self.path = self.get_cleaned_path()  # Clean the path if auto_clean is set
+            self.path = self.clean()  # Clean the path if auto_clean is set
 
-    def check_if_valid(self):
+    def validate(self):
         # First, validate the storage service
-        self.service.check_if_valid()
+        self.service.validate()
         
         # If os_sync is provided, validate the OS-specific checks
         if self.os_service:
-            self.os_service.check_if_valid()
+            self.os_service.validate()
 
-    def get_cleaned_path(self):
-        cleaned_path = self.service.get_cleaned_path()  # Get cleaned path from the service
+    def clean(self):
+        cleaned_path = self.service.clean()  # Get cleaned path from the service
         # If os_sync is provided, we can optionally return the cleaned path from the OS service as well if needed
         if self.os_service:
-            cleaned_path = self.os_service.get_cleaned_path()  # Adjust based on OS checks if necessary
+            cleaned_path = self.os_service.clean()  # Adjust based on OS checks if necessary
         return cleaned_path

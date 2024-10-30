@@ -23,8 +23,8 @@ class ShareFile(BaseService):
     def clean(self, raise_error=True):
         """Clean and return a ShareFile-compliant path; validate if raise_error is True."""
         cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
 
         # Remove trailing periods and spaces from each part
         cleaned_path_parts = []

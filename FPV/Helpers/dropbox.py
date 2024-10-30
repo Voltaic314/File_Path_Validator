@@ -33,9 +33,9 @@ class Dropbox(BaseService):
     def clean(self, raise_error=True):
         """Clean and return a Dropbox-compliant path; validate if raise_error is True."""
         cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", raise_error=raise_error)
-        cleaned_path = self.clean_and_validate_path("restricted_names", raise_error=raise_error)
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
         cleaned_path = self.remove_whitespace_around_parts(cleaned_path)
         cleaned_path = self.remove_empty_parts(cleaned_path)
 

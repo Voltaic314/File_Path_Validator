@@ -13,16 +13,17 @@ class BaseService:
         "part_ends_with_period": {"validate": "validate_if_part_ends_with_period", "clean": "remove_trailing_periods"},
         "whitespace_around_parts": {"validate": "validate_if_whitespace_around_parts", "clean": "remove_whitespace_around_parts"},
         "empty_parts": {"validate": "validate_empty_parts", "clean": "remove_empty_parts"},
+        "invalid_characters": {"validate": "validate_invalid_characters", "clean": "remove_invalid_characters"},
         "_main": {"validate": "validate", "clean": "clean"}
     }
 
-    def __init__(self, path: str, auto_clean: bool = False):
+    def __init__(self, path: str, auto_clean: bool = False, relative: bool = True):
         self.original_path = path
         self.path = path.replace("\\", "/")
-        self.path = f"/{self.path}" if not self.path.startswith("/") else self.path
         self.path_parts = self.path.strip("/").split('/') if '/' in self.path else [self.path]
-        self.path_parts = [part for part in self.path_parts if part]  # Remove empty parts
+        self.path = f"/{self.path}" if not self.path.startswith("/") else self.path
         self.restricted_names = set()
+        self.relative = relative
 
         if auto_clean:
             self.path = self.clean()
@@ -46,7 +47,7 @@ class BaseService:
         """
         return getattr(self, self.corresponding_validate_and_clean_methods[method][action], **kwargs)
     
-    def clean_and_validate_path(self, method: str, raise_error: bool = True, **kwargs):
+    def clean_and_validate_path(self, method: str, raise_error: bool = False, path: str = '', **kwargs):
         """
         Clean the path with the specified clean method, then optionally validate.
         
@@ -59,14 +60,14 @@ class BaseService:
         """
         # Call the clean method
         clean_method = self.get_validate_or_clean_method(method, "clean")
-        cleaned_path = clean_method(self.path, **kwargs)
+        cleaned_path = clean_method(path if path else self.path, **kwargs)
 
         # If raise_error is set, validate the cleaned path
         if raise_error:
             # Create a new instance of the current class with the cleaned path
             cleaned_instance = self.__class__(cleaned_path, **kwargs)
             validate_method = self.get_validate_or_clean_method(method, "validate")
-            validate_method(cleaned_instance)  # Call the validate method on the new instance
+            cleaned_instance.validate()
 
         return cleaned_path
 
@@ -75,10 +76,14 @@ class BaseService:
         return re.search(invalid_pattern, part)
 
     def validate_invalid_characters(self):
-        """validate for invalid characters in each part of the path."""
+        """Validate for invalid characters in each part of the path and report specific invalid characters."""
         for part in self.path_parts:
-            if self.path_part_contains_invalid_characters(part):
-                raise ValueError(f'Invalid characters found in part: "{part}".')
+            match = self.path_part_contains_invalid_characters(part)
+            if match:
+                raise ValueError(
+                    f'Invalid character "{match.group()}" found in part: "{part}". '
+                    f'Please ensure the path does not contain any of the following characters: {self.invalid_characters}'
+                )
 
     def remove_invalid_characters(self, path):
         """Remove invalid characters from each part of the path and return the cleaned path."""
@@ -109,13 +114,12 @@ class BaseService:
         max_path_length = self.max_length - filename_length - 1
         truncated_path = path[:max_path_length]
         
-        return f"{truncated_path}/{filename}"
-
+        return f"/{truncated_path.strip('/')}/{filename.strip('/')}"
 
     def validate_restricted_names(self):
         """validate for restricted names in each part of the path."""
         for part in self.path_parts:
-            if part in self.restricted_names:
+            if part.lower() in [s.lower() for s in self.restricted_names]:
                 raise ValueError(f'Restricted name "{part}" found in path.')
 
     def remove_restricted_names(self, path):
@@ -156,7 +160,7 @@ class BaseService:
         return "/".join(cleaned_parts)
 
     def validate(self):
-        pass
+        return True
 
-    def clean(self):
-        pass
+    def clean(self, raise_error=True):
+        return self.path
