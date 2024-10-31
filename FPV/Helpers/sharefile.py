@@ -1,57 +1,51 @@
-import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
-class ShareFile(BaseService):
-    # Invalid characters for ShareFile file and folder names
+
+class FPV_ShareFile(FPV_Base):
+    # Invalid characters specific to ShareFile
     invalid_characters = ':;*?"<>~'
+    max_length = 255  # ShareFile has a maximum path length of 255 characters
 
-    @staticmethod
-    def path_part_contains_invalid_characters(part):
-        invalid_pattern = re.compile(f"[{re.escape(ShareFile.invalid_characters)}]")
-        return re.search(invalid_pattern, part)
+    def __init__(self, path: str, auto_clean=False, relative=True):
+        super().__init__(path, auto_clean=auto_clean)
+        self.auto_clean = auto_clean
+        self.relative = relative
 
-    def __init__(self, path: str):
-        super().__init__(path)  # Call the base class constructor
+        if self.auto_clean:
+            self.path = self.clean()
 
-    def check_if_valid(self):
-
-        # Call the base class check for general validation and path length
-        super().check_if_valid()
+    def validate(self):
+        """Validate the full path for ShareFile, including invalid characters."""
+        self.validate_path_length()
+        self.validate_invalid_characters()
         
-        # invalid char check
+        # Validate each part does not end with a period and has no leading/trailing spaces
         for part in self.path_parts:
-            invalid_character = ShareFile.path_part_contains_invalid_characters(part)
-            if invalid_character:
-                raise ValueError(
-                    f'Invalid character "{invalid_character.group()}" found in this section of the proposed file path: "{part}". '
-                    f'Please make sure the file path does not contain any of the following characters: {ShareFile.invalid_characters}'
-                )
+            self.validate_if_part_ends_with_period(part)
+            self.validate_if_whitespace_around_parts(part)
 
-        return True
-    
-    def get_cleaned_path(self, raise_error: bool = True):
-        cleaned_path = super().get_cleaned_path(raise_error)
-        
+        self.validate_empty_parts()
+
+    def clean(self, raise_error=True):
+        """Clean and return a ShareFile-compliant path; validate if raise_error is True."""
+        cleaned_path = self.path
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+
+        # Remove trailing periods and spaces from each part
         cleaned_path_parts = []
         for part in cleaned_path.split("/"):
-            for char in self.invalid_characters:
-                part = part.replace(char, "")
+            part = self.remove_trailing_periods(part)
+            part = self.remove_whitespace_around_parts(part)
+            if part:
+                cleaned_path_parts.append(part)
 
-            
-            part = part.strip().rstrip(".")
-            
-            if not part:
-                continue
-            
-            cleaned_path_parts.append(part)
-        
-        output_path = '/'.join(cleaned_path_parts)
-        output_path = output_path.strip('/')
-        output_path = f'{"/" + output_path}' if not output_path.startswith("/") else output_path
+        cleaned_path = "/".join(cleaned_path_parts).strip("/")
+        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
 
-        cleaned_path_instance = ShareFile(output_path)
+        # Revalidate cleaned path if needed
         if raise_error:
-            cleaned_path_instance.check_if_valid()
-        
-        return cleaned_path_instance.path
-    
+            cleaned_path_instance = FPV_ShareFile(cleaned_path, auto_clean=False)
+            cleaned_path_instance.validate()
+
+        return cleaned_path

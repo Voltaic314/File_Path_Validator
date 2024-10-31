@@ -1,82 +1,91 @@
-import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
-class OneDrive(BaseService):
-    # Set maximum path length for OneDrive
-    max_length = 255  # Default for Windows sync, can be overridden if needed
+class FPV_OneDrive(FPV_Base):
+    # Set invalid characters and max path length for OneDrive
+    invalid_characters = FPV_Base.invalid_characters + "#%&*:{}<>?|\""
+    max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
 
-    def __init__(self, path: str, windows_sync: bool = True):
-        super().__init__(path)  # Call the base class constructor
-        # Set maximum path length based on the sync option
-        self.max_length = 255 if windows_sync else 400
+    def __init__(self, path: str, auto_clean=False, relative=True):
+        super().__init__(path, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
 
-        # List of restricted names for OneDrive
-        self.RESTRICTED_NAMES = {
+        self.restricted_names = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
-            "COM0", "COM1", "COM2", "COM3", "COM4", 
-            "COM5", "COM6", "COM7", "COM8", "COM9", 
-            "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", 
-            "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", 
-            "_vti_", "desktop.ini"
+            "COM1", "COM2", "COM3", "COM4", "COM5", 
+            "COM6", "COM7", "COM8", "COM9", "LPT1", 
+            "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
+            "LPT7", "LPT8", "LPT9", "_vti_", "desktop.ini"
         }
-        self.RESTRICTED_PREFIX = "~$"
-        self.RESTRICTED_ROOT_LEVEL_FOLDER = "forms"
+        self.restricted_prefix = "~$"
+        self.restricted_root_level_folder = "forms"
 
-    def check_if_valid(self):
-        # Call the base class check for path length and general validation
-        super().check_if_valid()  
+        # Adding custom corresponding methods to our clean/validate helpers in the base class
+        self.corresponding_validate_and_clean_methods.update(
+            {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"},
+            "restricted_root_folder": {"validate": "validate_restricted_root_folder", "clean": "remove_restricted_root_folder"}}
+        )
 
-        # Check each part of the path for OneDrive specific restrictions
+        if self.auto_clean:
+            self.path = self.clean()
+
+    def validate(self):
+        """Validate the full path for OneDrive, including OneDrive-specific validations."""
+        self.validate_path_length()
+        self.validate_invalid_characters()
+        self.validate_restricted_names()
+        self.validate_if_part_ends_with_period()
+        self.validate_if_whitespace_around_parts()
+
+        # Apply OneDrive-specific checks on each path part
         for part in self.path_parts:
-            
-            # Check for restricted names
-            if part in self.RESTRICTED_NAMES:
-                raise ValueError(f'Restricted name found in path: "{part}"')
-            
-            # Check for leading or trailing spaces
-            if part != part.strip():
-                raise ValueError(f'Leading or trailing spaces found in path: "{part}"')
-            
-            # Check for restricted prefixes
-            if part.startswith(self.RESTRICTED_PREFIX):
-                raise ValueError(f'Restricted prefix found in path: "{part}"')
-            
-            # Check for restricted root level folder name
-            if part.lower() == self.RESTRICTED_ROOT_LEVEL_FOLDER and self.path_parts.index(part) == 0:
-                raise ValueError(f'Restricted root level folder name found in path: "{part}". Please make sure the first part of the path is not "{self.RESTRICTED_ROOT_LEVEL_FOLDER}"')
+            self.validate_restricted_prefix(part)
+            self.validate_restricted_root_folder(part)
 
-        return True
-    
-    def get_cleaned_path(self, raise_error: bool = True):
-        cleaned_path = super().get_cleaned_path(raise_error)
-        
+        self.validate_empty_parts()
+
+    def clean(self, raise_error=True):
+        """Clean the path to be OneDrive-compliant and validate if `raise_error` is True."""
+        cleaned_path = self.path
+        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
+
+        # Clean up prefixes and handle restricted root folder
         cleaned_path_parts = []
-        # Check for restricted prefixes
         for index, part in enumerate(cleaned_path.split("/")):
-
-            # Remove restricted names
-            for restricted_name in self.RESTRICTED_NAMES:
-                part = part.replace(restricted_name, "")  
-
-            # strip whitespace and dots
+            part = self.remove_restricted_prefix(part)
+            if index == 0:
+                part = self.remove_restricted_root_folder(part)
             part = part.strip().rstrip(".")
-
-            # Remove restricted prefixes
-            for restricted_prefix in self.RESTRICTED_PREFIX:
-                part = part.replace(restricted_prefix, "")
-            
-            if index == 0 and part.lower() == self.RESTRICTED_ROOT_LEVEL_FOLDER:
-                part = part.replace(part, "")
-            
             if part:
                 cleaned_path_parts.append(part)
-
-        output_path = "/".join(cleaned_path_parts)
-        output_path = output_path.strip("/")
-        output_path = f'{"/" + output_path}' if not output_path.startswith("/") else output_path
-
-        cleaned_path_instance = OneDrive(output_path)
-        if raise_error:
-            cleaned_path_instance.check_if_valid()
         
-        return cleaned_path_instance.path
+        cleaned_path = "/".join(cleaned_path_parts).strip("/")
+        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
+
+        # Revalidate if needed
+        if raise_error:
+            cleaned_path_instance = FPV_OneDrive(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance.validate()
+
+        return cleaned_path
+
+    # OneDrive-specific helper methods
+    def validate_restricted_prefix(self, part):
+        """Validate that a part of the path does not start with the restricted prefix."""
+        if part.startswith(self.restricted_prefix):
+            raise ValueError(f'Restricted prefix "{self.restricted_prefix}" found in path part: "{part}"')
+
+    def validate_restricted_root_folder(self, part):
+        """Validate that the first part of the path is not the restricted root folder."""
+        if part.lower() == self.restricted_root_level_folder and self.path_parts.index(part) == 0:
+            raise ValueError(f'Restricted root folder "{self.restricted_root_level_folder}" found at path root: "{part}"')
+
+    def remove_restricted_prefix(self, part):
+        """Remove the restricted prefix from a path part if present."""
+        return part[len(self.restricted_prefix):] if part.startswith(self.restricted_prefix) else part
+
+    def remove_restricted_root_folder(self, part):
+        """Remove the restricted root folder name if it is the first part of the path."""
+        return "" if part.lower() == self.restricted_root_level_folder else part

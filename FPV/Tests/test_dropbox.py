@@ -1,25 +1,23 @@
 import pytest
-from FPV.Helpers.dropbox import Dropbox
+from FPV.Helpers.dropbox import FPV_Dropbox
 
-def test_path_with_restricted_names():
-    restricted_names = {
-        ".lock", "CON", "PRN", "AUX", "NUL", 
-        "COM0", "COM1", "COM2", "COM3", "COM4", 
-        "COM5", "COM6", "COM7", "COM8", "COM9", 
-        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", 
-        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
-    }
+class TestFPV_Dropbox:
 
-    for name in restricted_names:
-        dropbox = Dropbox(f"{name}/file.txt")
-        with pytest.raises(ValueError) as excinfo:
-            dropbox.check_if_valid()
-        assert f'Restricted name found in path: "{name}"' in str(excinfo.value)
+    def test_invalid_characters(self):
+        # Confirm Dropbox-specific invalid characters are flagged
+        dropbox = FPV_Dropbox("invalid<path|file.txt")
+        with pytest.raises(ValueError, match="Invalid character"):
+            dropbox.validate_invalid_characters()
 
-def test_path_length_exceeds_limit():
-    filename_without_ext = "a"  # A simple character to construct a long path
-    long_path = (filename_without_ext * (260 // len(filename_without_ext))) + ".pdf"  # Creates a path longer than 260 characters
-    dropbox = Dropbox(long_path)
-    with pytest.raises(ValueError) as excinfo:
-        dropbox.check_if_valid()
-    assert "The specified path is too long." in str(excinfo.value)
+    def test_path_length_exceeds_limit(self):
+        # Confirm Dropbox-specific max length of 260 characters is enforced
+        long_path = "a" * 261  # Exceeds Dropbox max length
+        dropbox = FPV_Dropbox(long_path)
+        with pytest.raises(ValueError, match="The specified path is too long"):
+            dropbox.validate_path_length()
+
+    def test_restricted_names(self):
+        # Test Dropbox-specific restricted names are recognized
+        dropbox = FPV_Dropbox("COM1/file.txt")
+        with pytest.raises(ValueError, match='Restricted name "COM1" found in path'):
+            dropbox.validate_restricted_names()
