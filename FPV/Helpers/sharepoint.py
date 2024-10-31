@@ -1,9 +1,9 @@
 import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
-class SharePoint(BaseService):
+class FPV_SharePoint(FPV_Base):
     # Invalid characters specific to SharePoint, adding "#" to the base invalid characters
-    invalid_characters = BaseService.invalid_characters + "#"
+    invalid_characters = FPV_Base.invalid_characters + "#"
 
     def __init__(self, path: str, auto_clean=False, relative=True):
         super().__init__(path, auto_clean=auto_clean, relative=relative)
@@ -63,7 +63,7 @@ class SharePoint(BaseService):
 
         # Revalidate if needed
         if raise_error:
-            cleaned_path_instance = SharePoint(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance = FPV_SharePoint(cleaned_path, auto_clean=False, relative=self.relative)
             cleaned_path_instance.validate()
 
         return cleaned_path

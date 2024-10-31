@@ -1,8 +1,8 @@
 import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
 
-class Windows(BaseService):
+class FPV_Windows(FPV_Base):
     invalid_characters = '<>:"|?*'
     max_length = 255
 
@@ -50,7 +50,7 @@ class Windows(BaseService):
 
         # Validate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = Windows(cleaned_path)
+            cleaned_path_instance = FPV_Windows(cleaned_path)
             cleaned_path_instance.validate()
 
         return cleaned_path
@@ -62,7 +62,7 @@ class Windows(BaseService):
             raise ValueError(f"Invalid or missing drive letter in the path: '{self.path}'")
 
 
-class MacOS(BaseService):
+class FPV_MacOS(FPV_Base):
     invalid_characters = ''  # No additional invalid characters besides path delimiters
 
     def __init__(self, path, auto_clean=False):
@@ -81,13 +81,13 @@ class MacOS(BaseService):
         cleaned_path = self.get_validate_or_clean_method("restricted_names", "clean", path=cleaned_path)
 
         if raise_error:
-            cleaned_path_instance = MacOS(cleaned_path)
+            cleaned_path_instance = FPV_MacOS(cleaned_path)
             cleaned_path_instance.validate()
 
         return cleaned_path
 
 
-class Linux(BaseService):
+class FPV_Linux(FPV_Base):
     invalid_characters = '\0'  # Only null character is invalid on Linux
 
     def __init__(self, path, auto_clean=False):
@@ -123,7 +123,7 @@ class Linux(BaseService):
         cleaned_path = cleaned_path.replace('\0', '')
 
         if raise_error:
-            cleaned_path_instance = Linux(cleaned_path)
+            cleaned_path_instance = FPV_Linux(cleaned_path)
             cleaned_path_instance.validate()
 
         return cleaned_path

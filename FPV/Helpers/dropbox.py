@@ -1,7 +1,7 @@
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
 
-class Dropbox(BaseService):
+class FPV_Dropbox(FPV_Base):
     # Dropbox has a maximum path length of 260 characters
     invalid_characters = '<>:"|?*.'
     max_length = 260
@@ -41,7 +41,7 @@ class Dropbox(BaseService):
 
         # Revalidate if needed
         if raise_error:
-            cleaned_path_instance = Dropbox(cleaned_path)
+            cleaned_path_instance = FPV_Dropbox(cleaned_path)
             cleaned_path_instance.validate()
 
         return cleaned_path

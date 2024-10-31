@@ -1,5 +1,5 @@
 import pytest
-from FPV.Helpers.sharefile import ShareFile
+from FPV.Helpers.sharefile import FPV_ShareFile
 
 
 def test_sharefile_invalid_characters():
@@ -8,5 +8,5 @@ def test_sharefile_invalid_characters():
 
     for char in invalid_characters:
         with pytest.raises(ValueError) as excinfo:
-            ShareFile(f"valid/path/to/file{char}.txt").validate()
+            FPV_ShareFile(f"valid/path/to/file{char}.txt").validate()
         assert f'Invalid character' in str(excinfo.value)

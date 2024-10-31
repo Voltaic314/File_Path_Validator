@@ -1,9 +1,8 @@
-import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
-class OneDrive(BaseService):
+class FPV_OneDrive(FPV_Base):
     # Set invalid characters and max path length for OneDrive
-    invalid_characters = BaseService.invalid_characters + "#%&*:{}<>?|\""
+    invalid_characters = FPV_Base.invalid_characters + "#%&*:{}<>?|\""
     max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
 
     def __init__(self, path: str, auto_clean=False, relative=True):
@@ -61,7 +60,7 @@ class OneDrive(BaseService):
 
         # Revalidate if needed
         if raise_error:
-            cleaned_path_instance = OneDrive(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance = FPV_OneDrive(cleaned_path, auto_clean=False, relative=self.relative)
             cleaned_path_instance.validate()
 
         return cleaned_path

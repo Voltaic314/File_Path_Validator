@@ -1,31 +1,31 @@
 # Import storage service classes
-from FPV.Helpers.box import Box
-from FPV.Helpers.dropbox import Dropbox
-from FPV.Helpers.egnyte import Egnyte
-from FPV.Helpers.onedrive import OneDrive
-from FPV.Helpers.sharefile import ShareFile
-from FPV.Helpers.sharepoint import SharePoint
+from FPV.Helpers.box import FPV_Box
+from FPV.Helpers.dropbox import FPV_Dropbox
+from FPV.Helpers.egnyte import FPV_Egnyte
+from FPV.Helpers.onedrive import FPV_OneDrive
+from FPV.Helpers.sharefile import FPV_ShareFile
+from FPV.Helpers.sharepoint import FPV_SharePoint
 
 # import Operating System classes
-from FPV.Helpers._os_classes import Windows, MacOS, Linux
+from FPV.Helpers._os_classes import FPV_Windows, FPV_MacOS, FPV_Linux
 
 
 class Validator:
     # A mapping of service names to their respective classes
     services = {
-        "dropbox": Dropbox,
-        "box": Box,
-        "egnyte": Egnyte,
-        "onedrive": OneDrive,
-        "sharefile": ShareFile,
-        "sharepoint": SharePoint,
+        "dropbox": FPV_Dropbox,
+        "box": FPV_Box,
+        "egnyte": FPV_Egnyte,
+        "onedrive": FPV_OneDrive,
+        "sharefile": FPV_ShareFile,
+        "sharepoint": FPV_SharePoint,
     }
 
     # A mapping of OS names to their respective classes
     os_services = {
-        "windows": Windows,
-        "macos": MacOS,
-        "linux": Linux
+        "windows": FPV_Windows,
+        "macos": FPV_MacOS,
+        "linux": FPV_Linux
     }
 
     def __init__(self, path: str, service_name: str = "windows", os_sync: str = None, **kwargs):
@@ -42,7 +42,7 @@ class Validator:
             self.service = self.os_services[service_name.lower()](self.path, **kwargs)  # Instantiate the OS provider
         else:
             # Default to Windows service if not found
-            self.service = Windows(self.path, **kwargs)
+            self.service = FPV_Windows(self.path, **kwargs)
 
         # If os_sync is provided and not an OS service, instantiate the appropriate OS class
         if os_sync and os_sync.lower() in self.os_services and service_name.lower() not in self.os_services:

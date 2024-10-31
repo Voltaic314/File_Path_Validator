@@ -1,5 +1,5 @@
 import pytest
-from FPV.Helpers.onedrive import OneDrive
+from FPV.Helpers.onedrive import FPV_OneDrive
 
 def test_onedrive_restricted_names():
     # OneDrive-specific restricted names to validate against
@@ -13,27 +13,27 @@ def test_onedrive_restricted_names():
     
     for name in reserved_names:
         with pytest.raises(ValueError) as excinfo:
-            OneDrive(f"{name}/folder/test.txt").validate()
+            FPV_OneDrive(f"{name}/folder/test.txt").validate()
         assert f'Restricted name "{name}" found in path.' in str(excinfo.value)
 
 def test_onedrive_restricted_prefix():
     # Test that paths with the restricted "~$" prefix raise an error
     prefix = "~$"
     with pytest.raises(ValueError) as excinfo:
-        OneDrive(f"{prefix}temp/file.txt").validate()
+        FPV_OneDrive(f"{prefix}temp/file.txt").validate()
     assert f'Restricted prefix "{prefix}" found in path part: "{prefix}temp"' in str(excinfo.value)
 
 def test_onedrive_restricted_root_folder():
     # Validate that "forms" cannot be the first part of the path in OneDrive
     restricted_root_folder = "forms"
     with pytest.raises(ValueError) as excinfo:
-        OneDrive(f"{restricted_root_folder}/folder/test.txt").validate()
+        FPV_OneDrive(f"{restricted_root_folder}/folder/test.txt").validate()
     assert f'Restricted root folder "{restricted_root_folder}" found at path root: "{restricted_root_folder}"' in str(excinfo.value)
 
 def test_onedrive_clean_path():
     # Example path with mixed violations for OneDrive
     path = "~$temp/.lock/forms/folder/invalid#chars.txt"
-    onedrive = OneDrive(path, auto_clean=False)
+    onedrive = FPV_OneDrive(path, auto_clean=False)
     cleaned_path = onedrive.clean()
 
     # Assertions for cleaned path to ensure it is OneDrive-compliant

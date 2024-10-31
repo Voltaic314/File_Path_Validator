@@ -1,5 +1,5 @@
 import pytest
-from FPV.Helpers.egnyte import Egnyte
+from FPV.Helpers.egnyte import FPV_Egnyte
 
 
 def test_egnyte_restricted_names():
@@ -15,14 +15,14 @@ def test_egnyte_restricted_names():
     }
     for name in restricted_names:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"{name}/folder/test.txt").validate()
+            FPV_Egnyte(f"{name}/folder/test.txt").validate()
         assert f'Restricted name "{name}" found in path.' in str(excinfo.value)
 
 
 def test_egnyte_part_length_exceeds_limit():
     long_part = "a" * 246  # Create a part longer than 245 characters
     with pytest.raises(ValueError) as excinfo:
-        Egnyte(f"{long_part}/folder/test.txt").validate()
+        FPV_Egnyte(f"{long_part}/folder/test.txt").validate()
     assert f"Path component exceeds 245 characters: '{long_part}'" in str(excinfo.value)
 
 
@@ -33,7 +33,7 @@ def test_egnyte_restricted_suffixes():
     ]
     for suffix in restricted_suffixes:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"folder_name{suffix}/file.txt").validate()
+            FPV_Egnyte(f"folder_name{suffix}/file.txt").validate()
         assert f"Path component 'folder_name{suffix}' has restricted suffix: '{suffix}'" in str(excinfo.value)
 
 
@@ -41,7 +41,7 @@ def test_egnyte_restricted_prefixes():
     restricted_prefixes = ["._", ".~", "word work file", "_egn_.", ".smbdelete", ".spotlight-"]
     for prefix in restricted_prefixes:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"{prefix}folder_name/file.txt").validate()
+            FPV_Egnyte(f"{prefix}folder_name/file.txt").validate()
         assert f"Path component '{prefix}folder_name' has restricted prefix: '{prefix}'" in str(excinfo.value)
 
 
@@ -49,7 +49,7 @@ def test_egnyte_tilde_suffix_combinations():
     starts_with_tilde_endings = [".idlk", ".xlsx", ".pptx"]
     for ending in starts_with_tilde_endings:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"~folder{ending}/file.txt").validate()
+            FPV_Egnyte(f"~folder{ending}/file.txt").validate()
         assert f"Path component '~folder{ending}' starts with '~' and ends with '{ending}'" in str(excinfo.value)
 
 
@@ -60,7 +60,7 @@ def test_egnyte_tilde_dollar_suffix_combinations():
     ]
     for ending in starts_with_tilde_dollar_endings:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"~$folder{ending}/file.txt").validate()
+            FPV_Egnyte(f"~$folder{ending}/file.txt").validate()
         assert f"Path component '~$folder{ending}' starts with '~$' and ends with '{ending}'" in str(excinfo.value)
 
 
@@ -73,14 +73,14 @@ def test_egnyte_temp_patterns():
     ]
     for temp_name in temp_patterns:
         with pytest.raises(ValueError) as excinfo:
-            Egnyte(f"{temp_name}/file.txt").validate()
+            FPV_Egnyte(f"{temp_name}/file.txt").validate()
         assert f"Path component '{temp_name}' matches restricted temporary file pattern." in str(excinfo.value)
 
 
 def test_egnyte_clean_path():
     # Example path with mixed violations, e.g., invalid characters, restricted prefixes, suffixes, and names
     path = "._ds_store/temp_folder_name_with_.docx"
-    egnyte = Egnyte(path, auto_clean=False)
+    egnyte = FPV_Egnyte(path, auto_clean=False)
     egnyte.max_length = 5000
     egnyte.part_length = 245
     cleaned_path = egnyte.clean()

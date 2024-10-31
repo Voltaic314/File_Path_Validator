@@ -1,8 +1,8 @@
 import re
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
 
-class Egnyte(BaseService):
+class FPV_Egnyte(FPV_Base):
     # Egnyte-specific character restrictions
     invalid_characters = ':*?"<>|'
     max_length = 5000  # Max path length
@@ -79,7 +79,7 @@ class Egnyte(BaseService):
 
         # Revalidate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = Egnyte(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance = FPV_Egnyte(cleaned_path, auto_clean=False, relative=self.relative)
             cleaned_path_instance.validate()
 
         return cleaned_path
@@ -153,7 +153,7 @@ class Egnyte(BaseService):
 
 if __name__ == "__main__":
     path = "._ds_store/temp_folder_name_with_~$file.docx/invalid|chars.tmp"
-    egnyte = Egnyte(path)
+    egnyte = FPV_Egnyte(path)
     egnyte.max_length = 5000
     egnyte.part_length = 245
     cleaned_path = egnyte.clean()

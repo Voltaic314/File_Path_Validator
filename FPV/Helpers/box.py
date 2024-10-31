@@ -1,7 +1,7 @@
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
 
-class Box(BaseService):
+class FPV_Box(FPV_Base):
     # Box-specific invalid characters and maximum length
     invalid_characters = ''
     max_length = 255
@@ -45,7 +45,7 @@ class Box(BaseService):
         cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
 
         if raise_error:
-            cleaned_path_instance = Box(cleaned_path, auto_clean=False, relative=self.relative)
+            cleaned_path_instance = FPV_Box(cleaned_path, auto_clean=False, relative=self.relative)
             cleaned_path_instance.validate()
 
         return cleaned_path

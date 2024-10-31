@@ -1,7 +1,7 @@
-from FPV.Helpers._base_service import BaseService
+from FPV.Helpers._base import FPV_Base
 
 
-class ShareFile(BaseService):
+class FPV_ShareFile(FPV_Base):
     # Invalid characters specific to ShareFile
     invalid_characters = ':;*?"<>~'
 
@@ -39,7 +39,7 @@ class ShareFile(BaseService):
 
         # Revalidate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = ShareFile(cleaned_path, auto_clean=False)
+            cleaned_path_instance = FPV_ShareFile(cleaned_path, auto_clean=False)
             cleaned_path_instance.validate()
 
         return cleaned_path

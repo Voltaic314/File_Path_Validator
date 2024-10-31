@@ -1,7 +1,7 @@
 import re
 
 
-class BaseService:
+class FPV_Base:
     """Base class for path validation and cleaning."""
     # Default invalid characters
     invalid_characters = ''
