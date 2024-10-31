@@ -69,7 +69,12 @@ if __name__ == "__main__":
 
 ## ⚙️ Key Methods
 - **`validate()`**: Runs all validation checks for the platform or service, raising `ValueError` if issues are found.
-- **`clean(raise_error=True)`**: Cleans the path to be compliant with the platform’s rules. If `raise_error=True`, it raises an exception for any uncleanable issues. 
+- **`clean(raise_error=True)`**: Cleans the path to be compliant with the platform’s rules. If `raise_error=True`, it raises an exception for any uncleanable issues. (This is also the default behavior).
+
+## Current limitations
+- This library does not currently support sharepoint site urls or url encoding for paths.
+- Currenly only Windows absolute path validation is supported via drive letter validation.
+- This library currently does not support windows network drive path validation. 
 
 ## 🤝 Contributing Guidelines
 Contributions are welcome! Please follow these guidelines:
