@@ -3,7 +3,7 @@ from FPV.Helpers._base import FPV_Base
 
 class FPV_Box(FPV_Base):
     # Box-specific invalid characters and maximum length
-    invalid_characters = ''
+    invalid_characters = '<>:"|?*'
     max_length = 255
 
     def __init__(self, path: str, auto_clean=False, relative=True):
@@ -27,9 +27,7 @@ class FPV_Box(FPV_Base):
         self.validate_restricted_names()
 
         # Validate each part for leading/trailing whitespace
-        for part in self.path_parts:
-            self.validate_if_whitespace_around_parts(part)
-
+        self.validate_if_whitespace_around_parts()
         self.validate_empty_parts()
 
     def clean(self, raise_error=True):
