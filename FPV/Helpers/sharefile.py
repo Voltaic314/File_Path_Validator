@@ -4,9 +4,15 @@ from FPV.Helpers._base import FPV_Base
 class FPV_ShareFile(FPV_Base):
     # Invalid characters specific to ShareFile
     invalid_characters = ':;*?"<>~'
+    max_length = 255  # ShareFile has a maximum path length of 255 characters
 
-    def __init__(self, path: str, auto_clean=False):
+    def __init__(self, path: str, auto_clean=False, relative=True):
         super().__init__(path, auto_clean=auto_clean)
+        self.auto_clean = auto_clean
+        self.relative = relative
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the full path for ShareFile, including invalid characters."""

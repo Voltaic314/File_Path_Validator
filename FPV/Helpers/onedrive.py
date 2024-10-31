@@ -6,7 +6,10 @@ class FPV_OneDrive(FPV_Base):
     max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
 
     def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean, relative=relative)
+        super().__init__(path, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
+
         self.restricted_names = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
             "COM1", "COM2", "COM3", "COM4", "COM5", 
@@ -22,6 +25,9 @@ class FPV_OneDrive(FPV_Base):
             {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"},
             "restricted_root_folder": {"validate": "validate_restricted_root_folder", "clean": "remove_restricted_root_folder"}}
         )
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the full path for OneDrive, including OneDrive-specific validations."""

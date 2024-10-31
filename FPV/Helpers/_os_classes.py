@@ -7,8 +7,10 @@ class FPV_Windows(FPV_Base):
     max_length = 255
 
     def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean, relative=relative)
-        if not relative:
+        super().__init__(path, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
+        if not self.relative:
             if self.path.startswith("/"):
                 self.path = self.path[1:] # this should fix any weird "/C:/" paths due to the base formatting it does :) 
         self.restricted_names = {
@@ -18,6 +20,9 @@ class FPV_Windows(FPV_Base):
             "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", 
             "LPT6", "LPT7", "LPT8", "LPT9"
         }
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the full path for Windows, including Windows-specific validations."""
@@ -41,16 +46,22 @@ class FPV_Windows(FPV_Base):
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
         
+        
         # Remove trailing periods and spaces
-        for part in self.path_parts:
-            cleaned_path = self.remove_trailing_periods(part)
-            cleaned_path = self.remove_whitespace_around_parts(part)
+        cleaned_path_parts = []
+        for part in cleaned_path.split("/"):
+            cleaned_part = self.remove_trailing_periods(part)
+            cleaned_part = self.remove_whitespace_around_parts(cleaned_part)
+            if cleaned_part:
+                cleaned_path_parts.append(cleaned_part)
+        cleaned_path = "/".join(cleaned_path_parts)
 
         cleaned_path = self.remove_empty_parts(cleaned_path)
+        cleaned_path = f"/{cleaned_path}" if self.relative else cleaned_path
 
         # Validate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = FPV_Windows(cleaned_path)
+            cleaned_path_instance = FPV_Windows(cleaned_path, relative=self.relative)
             cleaned_path_instance.validate()
 
         return cleaned_path
@@ -65,9 +76,14 @@ class FPV_Windows(FPV_Base):
 class FPV_MacOS(FPV_Base):
     invalid_characters = ''  # No additional invalid characters besides path delimiters
 
-    def __init__(self, path, auto_clean=False):
-        super().__init__(path, auto_clean)
+    def __init__(self, path, auto_clean=False, relative=True):
+        super().__init__(path)
         self.restricted_names = {".DS_Store", "._myfile"}  # Common Mac reserved names
+        self.auto_clean = auto_clean
+        self.relative = relative
+        
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the path for MacOS-specific restrictions."""
@@ -90,12 +106,17 @@ class FPV_MacOS(FPV_Base):
 class FPV_Linux(FPV_Base):
     invalid_characters = '\0'  # Only null character is invalid on Linux
 
-    def __init__(self, path, auto_clean=False):
-        super().__init__(path, auto_clean)
+    def __init__(self, path, auto_clean=False, relative=True):
+        super().__init__(path)
+        self.auto_clean = auto_clean
+        self.relative = relative
         
         self.corresponding_validate_and_clean_methods.update(
             {"null_character": {"validate": "validate_null_character", "clean": "clean_null_character"}}
         )
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate_null_character(self):
         """Check if the path contains a null character."""

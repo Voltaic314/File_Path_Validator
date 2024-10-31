@@ -78,8 +78,12 @@ class TestFPV_Base:
 
     def test_remove_whitespace_around_parts(self):
         service = FPV_Base("  mock / path / to / file  ")
-        cleaned_path = service.remove_whitespace_around_parts(service.path)
-        assert cleaned_path == "mock/path/to/file"
+        supposedly_clean_path_parts = []
+        for part in service.path.split("/"):
+            cleaned_part = service.remove_whitespace_around_parts(part)
+            supposedly_clean_path_parts.append(cleaned_part)
+        cleaned_path = "/".join(supposedly_clean_path_parts)
+        assert cleaned_path == "/mock/path/to/file"
 
     def test_validate_empty_parts(self):
         # Test empty part validation in path

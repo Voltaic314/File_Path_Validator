@@ -7,6 +7,8 @@ class FPV_SharePoint(FPV_Base):
 
     def __init__(self, path: str, auto_clean=False, relative=True):
         super().__init__(path, auto_clean=auto_clean, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
 
         # SharePoint-specific restricted names, prefixes, and root folder
         self.max_length = 400
@@ -25,6 +27,9 @@ class FPV_SharePoint(FPV_Base):
              "restricted_root_folder": {"validate": "validate_restricted_root_folder", "clean": "remove_restricted_root_folder"},
             }
         )
+        
+        if self.auto_clean:
+            self.path = self.clean()
     
     def validate(self):
         """Validate the full path for SharePoint, including SharePoint-specific validations."""

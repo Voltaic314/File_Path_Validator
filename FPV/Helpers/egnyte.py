@@ -9,7 +9,9 @@ class FPV_Egnyte(FPV_Base):
     part_length = 245  # Max length per path part
 
     def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean, relative=relative)
+        super().__init__(path, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
 
         # Define Egnyte-specific restricted names, suffixes, prefixes
         self.restricted_names = {
@@ -40,6 +42,9 @@ class FPV_Egnyte(FPV_Base):
             "prefixes": {"validate": "validate_prefixes", "clean": "remove_restricted_prefixes"},
             "temp_patterns": {"validate": "validate_temp_patterns", "clean": "remove_temp_patterns"}
         })
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the path according to Egnyte-specific rules."""
@@ -124,11 +129,11 @@ class FPV_Egnyte(FPV_Base):
                 raise ValueError(f"Path component '{part}' matches restricted temporary file pattern.")
 
     def remove_restricted_suffixes(self, part):
-        """Remove restricted Egnyte suffixes from a path part."""
+        """Remove the entire part if it ends with any restricted Egnyte suffix."""
         for suffix in self.endings:
             if part.lower().endswith(suffix):
-                part = "" # Remove the whole part if it ends with a restricted suffix
-        return part
+                return ""  # Entire part is removed if it has a restricted suffix
+        return part  # If no suffix matches, return part as is
 
     def remove_restricted_prefixes(self, part):
         """Remove all restricted Egnyte prefixes from a path part."""

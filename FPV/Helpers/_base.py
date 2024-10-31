@@ -77,7 +77,11 @@ class FPV_Base:
 
     def validate_invalid_characters(self):
         """Validate for invalid characters in each part of the path and report specific invalid characters."""
-        for part in self.path_parts:
+        for index, part in enumerate(self.path_parts):
+            # if not relative and current windows in current class name.lower() then skip the first part.
+            if not self.relative and "windows" in self.__class__.__name__.lower():
+                if index == 0:
+                    continue # this is handled in the windows sub class but it gives false positives here if this isn't here.
             match = self.path_part_contains_invalid_characters(part)
             if match:
                 raise ValueError(
@@ -88,7 +92,15 @@ class FPV_Base:
     def remove_invalid_characters(self, path):
         """Remove invalid characters from each part of the path and return the cleaned path."""
         cleaned_parts = []
-        for part in path.strip("/").split('/'):
+        for index, part in enumerate(path.strip("/").split('/')):
+
+            # this is some ugly hard coded bullshit if I'm being honest lol
+            if not self.relative and "windows" in self.__class__.__name__.lower():
+                if index == 0:
+                    self.invalid_characters = self.invalid_characters.replace(":", "")
+                else:
+                    self.invalid_characters = self.invalid_characters + ':' if ':' not in self.invalid_characters else self.invalid_characters
+            
             cleaned_part = re.sub(f"[{re.escape(self.invalid_characters)}]", "", part)
             if cleaned_part:  # Only add non-empty parts
                 cleaned_parts.append(cleaned_part)
@@ -143,11 +155,18 @@ class FPV_Base:
         for part in self.path_parts:
             if part != part.strip():
                 raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
-
+            if '.' in part:
+                for period_part in part.split('.'):
+                    if period_part != period_part.strip():
+                        raise ValueError(f'Leading or trailing spaces are not allowed in: "{period_part}".')
+                    
     def remove_whitespace_around_parts(self, path):
         """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
-        cleaned_parts = [part.strip() for part in path.strip("/").split('/') if part.strip()]
-        return "/".join(cleaned_parts)
+        path = path.strip("/").strip()
+        if '.' in path:
+            before, after = path.split('.')
+            path = f"{before.strip()}.{after.strip()}"
+        return path
 
     def validate_empty_parts(self):
         """validate for empty parts in the path."""

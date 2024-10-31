@@ -6,8 +6,10 @@ class FPV_Dropbox(FPV_Base):
     invalid_characters = '<>:"|?*.'
     max_length = 260
 
-    def __init__(self, path: str, auto_clean=False):
-        super().__init__(path, auto_clean=auto_clean)
+    def __init__(self, path: str, auto_clean=False, relative=True):
+        super().__init__(path)
+        self.auto_clean = auto_clean
+        self.relative = relative
         
         # Define restricted names specific to Dropbox
         self.restricted_names = {
@@ -17,6 +19,9 @@ class FPV_Dropbox(FPV_Base):
             "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
             "LPT7", "LPT8", "LPT9"
         }
+
+        if self.auto_clean:
+            self.path = self.clean()
 
     def validate(self):
         """Validate the full path for Dropbox, including Dropbox-specific validations."""

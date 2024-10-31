@@ -7,13 +7,19 @@ class FPV_Box(FPV_Base):
     max_length = 255
 
     def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean, relative=relative)
+        super().__init__(path, relative=relative)
+        self.auto_clean = auto_clean
+        self.relative = relative
         
         # Box-specific restricted names or unsupported file types
         self.restricted_names = {
             "outlook.pst", "quickbooks.qbb", "google_docs.gdoc", 
             "google_sheets.gsheet", "google_slides.gslides", "mac_package.pkg"
         }
+
+        if self.auto_clean:
+            self.path = self.clean()
+    
     def validate(self):
         """Validate the path for Box-specific rules, ignoring OS-specific restrictions."""
         self.validate_path_length()

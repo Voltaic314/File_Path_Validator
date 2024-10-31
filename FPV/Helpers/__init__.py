@@ -1,21 +1,21 @@
 # FPV/Helpers/__init__.py
 
-from .fpv_windows import FPV_Windows
-from .fpv_macos import FPV_MacOS
-from .fpv_linux import FPV_Linux
-from .fpv_dropbox import Dropbox
-from .fpv_egnyte import Egnyte
-from .fpv_onedrive import OneDrive
-from .fpv_sharepoint import SharePoint
-from .fpv_sharefile import ShareFile
+from ._os_classes import FPV_Windows
+from ._os_classes import FPV_MacOS
+from ._os_classes import FPV_Linux
+from .dropbox import FPV_Dropbox
+from .egnyte import FPV_Egnyte
+from .onedrive import FPV_OneDrive
+from .sharepoint import FPV_SharePoint
+from .sharefile import FPV_ShareFile
 
 __all__ = [
     "FPV_Windows",
     "FPV_MacOS",
     "FPV_Linux",
-    "Dropbox",
-    "Egnyte",
-    "OneDrive",
-    "SharePoint",
-    "ShareFile"
+    "FPV_Dropbox",
+    "FPV_Egnyte",
+    "FPV_OneDrive",
+    "FPV_SharePoint",
+    "FPV_ShareFile"
 ]
