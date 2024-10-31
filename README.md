@@ -38,7 +38,7 @@ The following example demonstrates basic usage with `FPV_Windows`:
 from FPV import FPV_Windows
 
 def main():
-    example_path = "C:/ Broken/ **path/to||file . txt"
+    example_path = "C:/ Broken/ **path/to/||file . txt"
     
     # Create a validator object
     FPVW = FPV_Windows(example_path, relative=True)
@@ -48,7 +48,7 @@ def main():
 
     # Get a cleaned version of your path
     cleaned_path = FPVW.clean()
-    print("Cleaned Path:", cleaned_path)  # Output should be "/path/to/file.txt"
+    print("Cleaned Path:", cleaned_path)  # Output should be "C:/Broken/path/to/file.txt"
 
     # Check if the original path is valid
     try:
