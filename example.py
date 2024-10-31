@@ -32,8 +32,8 @@ def main():
     # in the init before any other checks are done.
     # this ensures that when you do any checks, it does it on the cleaned path first.
     # sort of like an auto-correct feature. 
-    validator_auto_clean = FPV_Windows(example_path, auto_clean=True, relative=True)
-    print("Automatically Cleaned Path:", validator_auto_clean.path)
+    FPVW_Auto_Clean = FPV_Windows(example_path, auto_clean=True, relative=True)
+    print("Automatically Cleaned Path:", FPVW_Auto_Clean.path)
 
 
 if __name__ == "__main__":
