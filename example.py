@@ -4,7 +4,7 @@
 from FPV import FPV_Windows, FPV_MacOS, FPV_Linux
 
 # showing off the available cloud storage classes
-from FPV import FPV_Dropbox, FPV_Egnyte, FPV_OneDrive, FPV_SharePoint, FPV_ShareFile
+from FPV import FPV_Dropbox, FPV_Box, FPV_Egnyte, FPV_OneDrive, FPV_SharePoint, FPV_ShareFile
 
 
 def main():
