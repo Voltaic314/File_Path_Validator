@@ -75,7 +75,7 @@ if __name__ == "__main__":
 ## Current limitations
 - This library does not currently support sharepoint site urls or url encoding for paths.
 - Currenly only Windows absolute path validation is supported via drive letter validation.
-- This library currently does not support windows network drive path validation. 
+- This library currently does not support windows network drive path validation. (well technically it does, but just not the root (first part) of the network drive path. But if you do a str.split("\\")[1:] and pass that string into the windows validator, you should still be able to validate your path).
 
 ## 🤝 Contributing Guidelines
 Contributions are welcome! Please follow these guidelines:
