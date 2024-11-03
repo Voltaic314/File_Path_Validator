@@ -24,6 +24,7 @@ FPV provides support for the following:
 
 ### ☁️ Cloud Storage Providers
 - **Dropbox**
+- **Box**
 - **Egnyte**
 - **OneDrive**
 - **SharePoint**
