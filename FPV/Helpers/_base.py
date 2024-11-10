@@ -75,9 +75,11 @@ class FPV_Base:
         invalid_pattern = re.compile(f"[{re.escape(self.invalid_characters)}]")
         return re.search(invalid_pattern, part)
 
-    def validate_invalid_characters(self):
+    def validate_invalid_characters(self, path=''):
         """Validate for invalid characters in each part of the path and report specific invalid characters."""
-        for index, part in enumerate(self.path_parts):
+        if path: 
+            path_parts = path.strip("/").split('/')
+        for index, part in enumerate(self.path_parts if not path else path_parts):
             # if not relative and current windows in current class name.lower() then skip the first part.
             if not self.relative and "windows" in self.__class__.__name__.lower():
                 if index == 0:
@@ -106,9 +108,9 @@ class FPV_Base:
                 cleaned_parts.append(cleaned_part)
         return "/".join(cleaned_parts)
 
-    def validate_path_length(self):
+    def validate_path_length(self, path=''):
         """validate if the path length exceeds the maximum allowed."""
-        if self.max_length and len(self.path) > self.max_length:
+        if self.max_length and len(self.path if not path else path) > self.max_length:
             raise ValueError(f"The specified path is too long. Maximum allowed is {self.max_length} characters.")
 
     def truncate_path(self, path):
@@ -128,9 +130,11 @@ class FPV_Base:
         
         return f"/{truncated_path.strip('/')}/{filename.strip('/')}"
 
-    def validate_restricted_names(self):
+    def validate_restricted_names(self, path=''):
         """validate for restricted names in each part of the path."""
-        for part in self.path_parts:
+        if path: 
+            path_parts = path.strip("/").split('/')
+        for part in self.path_parts if not path else path_parts:
             if part.lower() in [s.lower() for s in self.restricted_names]:
                 raise ValueError(f'Restricted name "{part}" found in path.')
 
@@ -139,9 +143,11 @@ class FPV_Base:
         cleaned_parts = [part for part in path.strip("/").split('/') if part not in self.restricted_names]
         return "/".join(cleaned_parts)
 
-    def validate_if_part_ends_with_period(self):
+    def validate_if_part_ends_with_period(self, path=''):
         """validate if any part of the path ends with a period."""
-        for part in self.path_parts:
+        if path:
+            path_parts = path.strip("/").split('/')
+        for part in self.path_parts if not path else path_parts:
             if part.endswith('.'):
                 raise ValueError(f'"{part}" cannot end with a period.')
 
@@ -150,9 +156,11 @@ class FPV_Base:
         cleaned_parts = [part.rstrip('.') for part in path.strip("/").split('/') if part.rstrip('.')]
         return "/".join(cleaned_parts)
 
-    def validate_if_whitespace_around_parts(self):
+    def validate_if_whitespace_around_parts(self, path=''):
         """validate if there are leading or trailing spaces in any part of the path."""
-        for part in self.path_parts:
+        if path:
+            path_parts = path.strip("/").split('/')
+        for part in self.path_parts if not path else path_parts:
             if part != part.strip():
                 raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
             if '.' in part:
@@ -168,9 +176,11 @@ class FPV_Base:
             path = f"{before.strip()}.{after.strip()}"
         return path
 
-    def validate_empty_parts(self):
+    def validate_empty_parts(self, path=''):
         """validate for empty parts in the path."""
-        if '' in self.path_parts:
+        if path:
+            path_parts = path.strip("/").split('/')
+        if '' in self.path_parts if not path else path_parts:
             raise ValueError('Empty parts are not allowed in the path.')
 
     def remove_empty_parts(self, path):
@@ -178,8 +188,8 @@ class FPV_Base:
         cleaned_parts = [part for part in path.strip("/").split('/') if part]
         return "/".join(cleaned_parts)
 
-    def validate(self):
+    def validate(self, path=''):
         return True
 
-    def clean(self, raise_error=True):
-        return self.path
+    def clean(self, raise_error=True, path=''):
+        return self.path if not path else path

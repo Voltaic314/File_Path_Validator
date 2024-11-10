@@ -30,9 +30,9 @@ class FPV_Box(FPV_Base):
         self.validate_if_whitespace_around_parts()
         self.validate_empty_parts()
 
-    def clean(self, raise_error=True):
+    def clean(self, raise_error=True, path=''):
         """Clean and return a Box-compliant path, validating if raise_error is True."""
-        cleaned_path = self.path
+        cleaned_path = self.path if not path else path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
 

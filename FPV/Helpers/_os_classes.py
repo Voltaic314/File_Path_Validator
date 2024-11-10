@@ -39,9 +39,9 @@ class FPV_Windows(FPV_Base):
 
         self.validate_empty_parts()
 
-    def clean(self, raise_error=True):
+    def clean(self, raise_error=True, path=''):
         """Clean and return the Windows-compliant path, and validate if raise_error is True."""
-        cleaned_path = self.path
+        cleaned_path = self.path if not path else path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
@@ -81,17 +81,21 @@ class FPV_MacOS(FPV_Base):
         self.restricted_names = {".DS_Store", "._myfile"}  # Common Mac reserved names
         self.auto_clean = auto_clean
         self.relative = relative
+
+        ## TODO: Someone please investigate this max_length thing. I'm not sure if it's accurate. lol
+        self.max_length = 255 # technically I've seen it go up to 1000 or something but I think that's only if you enable certain flags in the OS settings or something.
         
         if self.auto_clean:
             self.path = self.clean()
 
-    def validate(self):
+    def validate(self, path=''):
         """Validate the path for MacOS-specific restrictions."""
-        self.validate_empty_parts()
-        self.validate_if_whitespace_around_parts()
-        self.validate_restricted_names()
+        self.validate_path_length(path=path)
+        self.validate_empty_parts(path=path)
+        self.validate_if_whitespace_around_parts(path=path)
+        self.validate_restricted_names(path=path)
 
-    def clean(self, raise_error=True):
+    def clean(self, raise_error=True, path=''):
         """Clean and return the MacOS-compliant path, and validate if raise_error is True."""
         cleaned_path = super().clean(raise_error=raise_error)
         cleaned_path = self.get_validate_or_clean_method("restricted_names", "clean", path=cleaned_path)

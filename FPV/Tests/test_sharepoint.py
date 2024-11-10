@@ -40,3 +40,61 @@ def test_sharepoint_clean_path():
     assert ".lock" not in cleaned_path
     assert "forms" not in cleaned_path.split('/')[0]  # Ensure "forms" is not the root folder
     assert cleaned_path == "/temp/forms/folder"
+
+def test_sharepoint_site_domain_invalid_characters():
+    # Test that an invalid site domain raises an error
+    invalid_site_domain = "example.com/"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{invalid_site_domain}/folder/test.txt").validate()
+    assert f'Invalid character "/" found in site domain: "{invalid_site_domain}"' in str(excinfo.value)
+    invalid_site_domain = "example$"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{invalid_site_domain}.sharepoint.com/folder/test.txt").validate()
+    assert f'Invalid characters found in site domain: "{invalid_site_domain}"' in str(excinfo.value)
+
+def test_sharepoint_site_domain_restricted_names():
+    # Test that a site domain with a restricted name raises an error
+    restricted_site_domain = "CON"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{restricted_site_domain}.sharepoint.com/folder/test.txt").validate()
+    assert f'Restricted name "{restricted_site_domain}" found in site domain' in str(excinfo.value)
+
+def test_sharepoint_site_domain_restricted_prefix():
+    # Test that a site domain starting with the restricted prefix raises an error
+    restricted_prefix = "~$"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{restricted_prefix}example.sharepoint.com/folder/test.txt").validate()
+    assert f'Restricted prefix "{restricted_prefix}" found in site domain: "{restricted_prefix}example"' in str(excinfo.value)
+
+# now test with whitespace around site domain
+def test_sharepoint_site_domain_whitespace():
+    # Test that a site domain with leading or trailing whitespace raises an error
+    site_domain = " example.sharepoint.com "
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{site_domain}/folder/test.txt").validate()
+    assert f'Leading or trailing spaces are not allowed in: "{site_domain}"' in str(excinfo.value)
+    site_domain = "example .sharepoint.com"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{site_domain}/folder/test.txt").validate()
+    assert f'Leading or trailing spaces are not allowed in: "{site_domain}"' in str(excinfo.value)
+
+def test_sharepoint_site_domain_ending_with_period():
+    # Test that a site domain ending with a period raises an error
+    site_domain = "example.sharepoint.com."
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{site_domain}/folder/test.txt").validate()
+    assert f'"{site_domain}" cannot end with a period.' in str(excinfo.value)
+    site_domain = "example..sharepoint.com"
+    with pytest.raises(ValueError) as excinfo:
+        FPV_SharePoint(f"https://{site_domain}/folder/test.txt").validate()
+    assert f'"example.." cannot end with a period.' in str(excinfo.value)
+
+def test_sharepoint_site_domain_cleaning():
+    # Test that SharePoint cleaning handles site domain restrictions properly
+    site_domain = " example.sharepoint.com "
+    sharepoint = FPV_SharePoint(f"https://{site_domain}/folder/test.txt", auto_clean=False)
+    cleaned_path = sharepoint.clean()
+
+    # Assert that site domain has been cleaned
+    assert cleaned_path == "https://example.sharepoint.com/sites/folder/test.txt"
+    assert cleaned_path == sharepoint.clean(raise_error=False)
