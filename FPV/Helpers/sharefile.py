@@ -6,8 +6,8 @@ class FPV_ShareFile(FPV_Base):
     invalid_characters = ':;*?"<>~'
     max_length = 255  # ShareFile has a maximum path length of 255 characters
 
-    def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean)
+    def __init__(self, path: str, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, auto_clean=auto_clean, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
         self.auto_clean = auto_clean
         self.relative = relative
 
@@ -31,17 +31,18 @@ class FPV_ShareFile(FPV_Base):
         cleaned_path = self.path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
 
         # Remove trailing periods and spaces from each part
         cleaned_path_parts = []
-        for part in cleaned_path.split("/"):
+        for part in cleaned_path.split(self.sep):
             part = self.remove_trailing_periods(part)
-            part = self.remove_whitespace_around_parts(part)
             if part:
                 cleaned_path_parts.append(part)
 
-        cleaned_path = "/".join(cleaned_path_parts).strip("/")
-        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
+        cleaned_path = self.sep.join(cleaned_path_parts).strip(self.sep)
+        cleaned_path = f"{self.sep}{cleaned_path}" if not cleaned_path.startswith(self.sep) else cleaned_path
 
         # Revalidate cleaned path if needed
         if raise_error:

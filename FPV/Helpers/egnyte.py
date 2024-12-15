@@ -8,8 +8,8 @@ class FPV_Egnyte(FPV_Base):
     max_length = 5000  # Max path length
     part_length = 245  # Max length per path part
 
-    def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path, relative=relative)
+    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
         self.auto_clean = auto_clean
         self.relative = relative
 
@@ -38,6 +38,7 @@ class FPV_Egnyte(FPV_Base):
         # Update validation and cleaning methods for Egnyte-specific needs
         self.corresponding_validate_and_clean_methods.update({
             "part_length": {"validate": "validate_part_length", "clean": "truncate_part_length"},
+            "path_length": {"validate": "validate_path_length", "clean": "truncate_path"},
             "suffixes": {"validate": "validate_suffixes", "clean": "remove_restricted_suffixes"},
             "prefixes": {"validate": "validate_prefixes", "clean": "remove_restricted_prefixes"},
             "temp_patterns": {"validate": "validate_temp_patterns", "clean": "remove_temp_patterns"}
@@ -49,7 +50,6 @@ class FPV_Egnyte(FPV_Base):
     def validate(self):
         """Validate the path according to Egnyte-specific rules."""
         self.validate_path_length()
-        self.validate_part_length()
         self.validate_restricted_names()
         self.validate_if_whitespace_around_parts()
 
@@ -57,6 +57,7 @@ class FPV_Egnyte(FPV_Base):
             self.validate_suffixes(part)
             self.validate_prefixes(part)
             self.validate_temp_patterns(part)
+            self.validate_part_length(part)
 
         self.validate_empty_parts()
 
@@ -64,11 +65,11 @@ class FPV_Egnyte(FPV_Base):
         """Clean and return an Egnyte-compliant path; validate if raise_error is True."""
         cleaned_path = self.path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("part_length", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("part_length", part=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
 
         cleaned_path_parts = []
-        for part in cleaned_path.split('/'):
+        for part in cleaned_path.split(self.sep):
             part = self.remove_restricted_suffixes(part)
             part = self.remove_restricted_prefixes(part)
             part = self.remove_temp_patterns(part)
@@ -79,8 +80,8 @@ class FPV_Egnyte(FPV_Base):
 
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
 
-        cleaned_path = '/'.join(cleaned_path_parts).strip('/')
-        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
+        cleaned_path = self.sep.join(cleaned_path_parts).strip(self.sep)
+        cleaned_path = f"{self.sep}{cleaned_path}" if not cleaned_path.startswith(self.sep) else cleaned_path
 
         # Revalidate cleaned path if needed
         if raise_error:
@@ -88,15 +89,26 @@ class FPV_Egnyte(FPV_Base):
             cleaned_path_instance.validate()
 
         return cleaned_path
+    
+    def validate_path_length(self, path=''):
+        """Validate the full path length for Egnyte (max 5000 characters)."""
+        path = path if path else self.path
+        if len(path) > self.max_length:
+            raise ValueError(f"Path exceeds 5000 characters: '{path}'")
+        # now check each part
+        for part in path.split(self.sep):
+            self.validate_part_length(part)
+
+    def truncate_path(self, path='', check_files=True):
+        return super().truncate_path(path, check_files)
 
     # Egnyte-specific helper methods
-    def validate_part_length(self):
+    def validate_part_length(self, part=''):
         """Validate each part's length for Egnyte (max 245 characters)."""
-        for part in self.path_parts:
-            if len(part) > self.part_length:
-                raise ValueError(f"Path component exceeds 245 characters: '{part}'")
+        if len(part) > self.part_length:
+            raise ValueError(f"Path component exceeds 245 characters: '{part}'")
             
-    def truncate_part_length(self, part):
+    def truncate_part_length(self, part=''):
         """Truncate each part to 245 characters."""
         return part[:self.part_length] if len(part) > self.part_length else part
 

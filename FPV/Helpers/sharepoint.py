@@ -5,8 +5,8 @@ class FPV_SharePoint(FPV_Base):
     # Invalid characters specific to SharePoint, adding "#" to the base invalid characters
     invalid_characters = FPV_Base.invalid_characters + "#"
 
-    def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path, auto_clean=auto_clean, relative=relative)
+    def __init__(self, path: str, auto_clean=False, relative=True, sep="/"):
+        super().__init__(path, auto_clean=auto_clean, relative=relative, sep=sep)
         self.auto_clean = auto_clean
         self.relative = relative
 

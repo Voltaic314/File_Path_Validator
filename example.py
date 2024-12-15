@@ -8,10 +8,11 @@ from FPV import FPV_Dropbox, FPV_Box, FPV_Egnyte, FPV_OneDrive, FPV_SharePoint, 
 
 
 def main():
-    example_path = "C:/ Broken/ **path/to/||file . txt"
+    example_path = "C:\\ Broken\\ **path\\to\\||file . txt"
     
     # Create a validator object
-    FPVW = FPV_Windows(example_path, relative=True)
+    FPVW = FPV_Windows(example_path, relative=False)
+    # if the path did not have a drive letter in it for windows paths, you can say relative=True or omit the relative argument.
 
     # Access the original path
     print("Original Path:", FPVW.original_path)
