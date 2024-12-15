@@ -6,8 +6,8 @@ class FPV_Dropbox(FPV_Base):
     invalid_characters = '<>:"|?*.'
     max_length = 260
 
-    def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path)
+    def __init__(self, path: str, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, auto_clean=auto_clean, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
         self.auto_clean = auto_clean
         self.relative = relative
         
@@ -41,7 +41,7 @@ class FPV_Dropbox(FPV_Base):
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
-        cleaned_path = self.remove_whitespace_around_parts(cleaned_path)
+        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
         cleaned_path = self.remove_empty_parts(cleaned_path)
 
         # Revalidate if needed

@@ -80,7 +80,7 @@ class TestFPV_Base:
         service = FPV_Base("  mock / path / to / file  ")
         supposedly_clean_path_parts = []
         for part in service.path.split("/"):
-            cleaned_part = service.remove_whitespace_around_parts(part)
+            cleaned_part = service.remove_whitespace_around_part(part)
             supposedly_clean_path_parts.append(cleaned_part)
         cleaned_path = "/".join(supposedly_clean_path_parts)
         assert cleaned_path == "/mock/path/to/file"

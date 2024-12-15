@@ -5,8 +5,8 @@ class FPV_OneDrive(FPV_Base):
     invalid_characters = FPV_Base.invalid_characters + "#%&*:{}<>?|\""
     max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
 
-    def __init__(self, path: str, auto_clean=False, relative=True):
-        super().__init__(path, relative=relative)
+    def __init__(self, path: str, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
         self.auto_clean = auto_clean
         self.relative = relative
 
@@ -50,10 +50,12 @@ class FPV_OneDrive(FPV_Base):
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
 
         # Clean up prefixes and handle restricted root folder
         cleaned_path_parts = []
-        for index, part in enumerate(cleaned_path.split("/")):
+        path_parts = cleaned_path.split(self.sep)
+        for index, part in enumerate(path_parts):
             part = self.remove_restricted_prefix(part)
             if index == 0:
                 part = self.remove_restricted_root_folder(part)
@@ -61,8 +63,8 @@ class FPV_OneDrive(FPV_Base):
             if part:
                 cleaned_path_parts.append(part)
         
-        cleaned_path = "/".join(cleaned_path_parts).strip("/")
-        cleaned_path = f"/{cleaned_path}" if not cleaned_path.startswith("/") else cleaned_path
+        cleaned_path = self.sep.join(cleaned_path_parts).strip(self.sep)
+        cleaned_path = f"{self.sep}{cleaned_path}" if not cleaned_path.startswith(self.sep) else cleaned_path
 
         # Revalidate if needed
         if raise_error:

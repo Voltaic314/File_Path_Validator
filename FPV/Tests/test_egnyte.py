@@ -25,6 +25,12 @@ def test_egnyte_part_length_exceeds_limit():
         FPV_Egnyte(f"{long_part}/folder/test.txt").validate()
     assert f"Path component exceeds 245 characters: '{long_part}'" in str(excinfo.value)
 
+def test_path_length_exceeds_limit():
+    sections = 21  
+    long_path = "/".join(["a" * 245] * sections) + ".txt"  # Create a path with more than 5000 characters
+    with pytest.raises(ValueError) as excinfo:
+        FPV_Egnyte(long_path).validate()
+    assert "Path exceeds 5000 characters" in str(excinfo.value)
 
 def test_egnyte_restricted_suffixes():
     restricted_suffixes = [

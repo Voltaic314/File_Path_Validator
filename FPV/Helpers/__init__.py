@@ -8,6 +8,7 @@ from .egnyte import FPV_Egnyte
 from .onedrive import FPV_OneDrive
 from .sharepoint import FPV_SharePoint
 from .sharefile import FPV_ShareFile
+from .box import FPV_Box
 
 __all__ = [
     "FPV_Windows",
@@ -17,5 +18,6 @@ __all__ = [
     "FPV_Egnyte",
     "FPV_OneDrive",
     "FPV_SharePoint",
-    "FPV_ShareFile"
+    "FPV_ShareFile",
+    "FPV_Box",
 ]

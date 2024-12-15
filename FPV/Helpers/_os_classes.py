@@ -6,12 +6,12 @@ class FPV_Windows(FPV_Base):
     invalid_characters = '<>:"|?*'
     max_length = 255
 
-    def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path, relative=relative)
+    def __init__(self, path, auto_clean=False, relative=True, sep='\\', check_files=True, check_folders=True):
+        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
         self.auto_clean = auto_clean
         self.relative = relative
         if not self.relative:
-            if self.path.startswith("/"):
+            if self.path.startswith(self.sep):
                 self.path = self.path[1:] # this should fix any weird "/C:/" paths due to the base formatting it does :) 
         self.restricted_names = {
             "CON", "PRN", "AUX", "NUL",
@@ -24,40 +24,43 @@ class FPV_Windows(FPV_Base):
         if self.auto_clean:
             self.path = self.clean()
 
-    def validate(self):
+    def validate(self, path='', relative=None):
         """Validate the full path for Windows, including Windows-specific validations."""
-        if not self.relative:
-            self.validate_drive_letter()
+        input_path = path if path else self.path
+        check_drive_letter = not self.relative if relative is None else not relative
+        if check_drive_letter:
+            self.validate_drive_letter(path=input_path)
         
-        self.validate_path_length()
-        self.validate_invalid_characters()
-        self.validate_restricted_names()
+        self.validate_path_length(path=input_path)
+        self.validate_invalid_characters(path=input_path)
+        self.validate_restricted_names(path=input_path)
         
         # Validate each part does not end with a period and has no leading/trailing spaces
-        self.validate_if_part_ends_with_period()
-        self.validate_if_whitespace_around_parts()
+        self.validate_if_part_ends_with_period(path=input_path)
+        self.validate_if_whitespace_around_parts(path=input_path)
 
-        self.validate_empty_parts()
+        self.validate_empty_parts(path=input_path)
 
-    def clean(self, raise_error=True):
+    def clean(self, path='', raise_error=True, check_files=True):
         """Clean and return the Windows-compliant path, and validate if raise_error is True."""
-        cleaned_path = self.path
+        cleaned_path = path if path else self.path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
+        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
         
         
         # Remove trailing periods and spaces
         cleaned_path_parts = []
-        for part in cleaned_path.split("/"):
+        path_parts = cleaned_path.split(self.sep)
+        for part in path_parts:
             cleaned_part = self.remove_trailing_periods(part)
-            cleaned_part = self.remove_whitespace_around_parts(cleaned_part)
             if cleaned_part:
                 cleaned_path_parts.append(cleaned_part)
-        cleaned_path = "/".join(cleaned_path_parts)
+        cleaned_path = self.sep.join(cleaned_path_parts)
 
         cleaned_path = self.remove_empty_parts(cleaned_path)
-        cleaned_path = f"/{cleaned_path}" if self.relative else cleaned_path
+        cleaned_path = f"{self.sep}{cleaned_path}" if self.relative else cleaned_path
 
         # Validate cleaned path if needed
         if raise_error:
@@ -66,18 +69,20 @@ class FPV_Windows(FPV_Base):
 
         return cleaned_path
 
-    def validate_drive_letter(self):
+    def validate_drive_letter(self, path=''):
         """Verify that the path starts with a valid drive letter (Windows-specific)."""
+        input_path = path if path else self.path
+        input_path_parts = input_path.strip(self.sep).split(self.sep)
         drive_letter_pattern = re.compile(r"^[A-Za-z]:")
-        if not drive_letter_pattern.match(self.path_parts[0]):
+        if not drive_letter_pattern.match(input_path_parts[0]):
             raise ValueError(f"Invalid or missing drive letter in the path: '{self.path}'")
 
 
 class FPV_MacOS(FPV_Base):
     invalid_characters = ''  # No additional invalid characters besides path delimiters
 
-    def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path)
+    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders, auto_clean=auto_clean)
         self.restricted_names = {".DS_Store", "._myfile"}  # Common Mac reserved names
         self.auto_clean = auto_clean
         self.relative = relative
@@ -106,8 +111,8 @@ class FPV_MacOS(FPV_Base):
 class FPV_Linux(FPV_Base):
     invalid_characters = '\0'  # Only null character is invalid on Linux
 
-    def __init__(self, path, auto_clean=False, relative=True):
-        super().__init__(path)
+    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
+        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders, auto_clean=auto_clean)
         self.auto_clean = auto_clean
         self.relative = relative
         
