@@ -9,7 +9,7 @@ from FPV import FPV_Dropbox, FPV_Box, FPV_Egnyte, FPV_OneDrive, FPV_SharePoint, 
 
 def main():
     example_path = "C:\\ Broken\\ **path\\to\\||file . txt"
-    
+
     # Create a validator object
     FPVW = FPV_Windows(example_path, relative=False)
     # if the path did not have a drive letter in it for windows paths, you can say relative=True or omit the relative argument.
@@ -18,7 +18,7 @@ def main():
     print("Original Path:", FPVW.original_path)
 
     # Get a cleaned version of your path
-    cleaned_path = FPVW.clean()
+    cleaned_path = FPVW.clean(path=example_path)
     print("Cleaned Path:", cleaned_path)  # Output should be "C:/Broken/path/to/file.txt"
 
     # Check if the original path is valid

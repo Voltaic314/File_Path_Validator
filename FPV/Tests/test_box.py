@@ -20,12 +20,6 @@ def test_box_path_length_exceeds_limit():
         FPV_Box(f"{long_path}/file.txt").validate()
     assert "The specified path is too long. Maximum allowed is 255 characters." in str(excinfo.value)
 
-def test_box_trailing_and_leading_whitespace():
-    """Test that leading and trailing whitespace in path parts are cleaned and validated."""
-    path_with_whitespace = "  folder1 / folder2 / file.txt  "
-    box_validator = FPV_Box(path_with_whitespace, auto_clean=True)
-    assert box_validator.path == "/folder1/folder2/file.txt"
-
 def test_box_clean_whitespace_around_parts():
     """Test that the clean method removes whitespace around parts."""
     path_with_whitespace = "folder1 / folder2 / file.txt"

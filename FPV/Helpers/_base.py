@@ -8,7 +8,6 @@ class FPV_Base:
     @staticmethod
     def normalize_path(path: str, relative: bool = True, sep='/') -> str:
         """Normalize the path by replacing backslashes with forward slashes and ensuring it starts with a slash."""
-        replace_strings = {"\\": sep, "/": sep}
         path = path.replace("\\", sep).replace("/", sep) # replace all slashes with the sep slashes
         if not path.startswith(sep):
             path = f"{sep}{path}" if relative else f"{path}"
@@ -22,6 +21,7 @@ class FPV_Base:
     # Default invalid characters
     invalid_characters = ''
     max_length = 0  # Default maximum length
+    restricted_names: set = set()
 
     corresponding_validate_and_clean_methods  = {
         "path_length": {"validate": "validate_path_length", "clean": "truncate_path"},
@@ -37,13 +37,20 @@ class FPV_Base:
         self.original_path: str = path
         self.sep: str = sep
         self.path: str = FPV_Base.normalize_path(path, relative, sep=self.sep)
-        self.path_parts: List[str] = FPV_Base.get_path_parts(self.path)
-        self.restricted_names: set = set()
+        self.path_parts: List[str] = FPV_Base.get_path_parts(self.path) 
         self.relative: bool = relative
         self.check_folders: bool = check_folders
         self.check_files: bool = check_files
+        self.auto_clean: bool = auto_clean
+        self.init_kwargs = {
+            "auto_clean": self.auto_clean,
+            "relative": self.relative,
+            "check_folders": self.check_folders,
+            "check_files": self.check_files,
+            "sep": self.sep
+        }
 
-        if auto_clean:
+        if self.auto_clean:
             self.path = self.clean()
 
     def get_validate_or_clean_method(self, method: str, action: str, **kwargs):
@@ -83,7 +90,9 @@ class FPV_Base:
         # If raise_error is set, validate the cleaned path
         if raise_error:
             # Create a new instance of the current class with the cleaned path
-            cleaned_instance = self.__class__(**kwargs)
+            cleaned_instance = self.__class__(path=cleaned_path, **self.init_kwargs)
+            # should we call the specific validate method or validate the whole thing? 
+            # Hmm....... I guess we'll just validate the whole thing for now.
             validate_method = self.get_validate_or_clean_method(method, "validate")
             cleaned_instance.validate()
 

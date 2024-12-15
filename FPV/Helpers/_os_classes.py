@@ -5,21 +5,21 @@ from FPV.Helpers._base import FPV_Base
 class FPV_Windows(FPV_Base):
     invalid_characters = '<>:"|?*'
     max_length = 255
+    restricted_names = {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", 
+        "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", 
+        "LPT6", "LPT7", "LPT8", "LPT9"
+    }
 
-    def __init__(self, path, auto_clean=False, relative=True, sep='\\', check_files=True, check_folders=True):
-        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
-        self.auto_clean = auto_clean
-        self.relative = relative
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
+        self.init_kwargs = kwargs
+        self.sep = kwargs.get("sep", "\\")
         if not self.relative:
             if self.path.startswith(self.sep):
                 self.path = self.path[1:] # this should fix any weird "/C:/" paths due to the base formatting it does :) 
-        self.restricted_names = {
-            "CON", "PRN", "AUX", "NUL",
-            "COM1", "COM2", "COM3", "COM4", "COM5", 
-            "COM6", "COM7", "COM8", "COM9",
-            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", 
-            "LPT6", "LPT7", "LPT8", "LPT9"
-        }
 
         if self.auto_clean:
             self.path = self.clean()
@@ -41,7 +41,7 @@ class FPV_Windows(FPV_Base):
 
         self.validate_empty_parts(path=input_path)
 
-    def clean(self, path='', raise_error=True, check_files=True):
+    def clean(self, path='', raise_error=True):
         """Clean and return the Windows-compliant path, and validate if raise_error is True."""
         cleaned_path = path if path else self.path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
@@ -64,7 +64,9 @@ class FPV_Windows(FPV_Base):
 
         # Validate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = FPV_Windows(cleaned_path, relative=self.relative)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_Windows(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path
@@ -81,12 +83,11 @@ class FPV_Windows(FPV_Base):
 class FPV_MacOS(FPV_Base):
     invalid_characters = ''  # No additional invalid characters besides path delimiters
 
-    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
-        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders, auto_clean=auto_clean)
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
         self.restricted_names = {".DS_Store", "._myfile"}  # Common Mac reserved names
-        self.auto_clean = auto_clean
-        self.relative = relative
-        
+        self.init_kwargs = kwargs
+
         if self.auto_clean:
             self.path = self.clean()
 
@@ -102,7 +103,9 @@ class FPV_MacOS(FPV_Base):
         cleaned_path = self.get_validate_or_clean_method("restricted_names", "clean", path=cleaned_path)
 
         if raise_error:
-            cleaned_path_instance = FPV_MacOS(cleaned_path)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_MacOS(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path
@@ -111,10 +114,9 @@ class FPV_MacOS(FPV_Base):
 class FPV_Linux(FPV_Base):
     invalid_characters = '\0'  # Only null character is invalid on Linux
 
-    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
-        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders, auto_clean=auto_clean)
-        self.auto_clean = auto_clean
-        self.relative = relative
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
+        self.init_kwargs = kwargs
         
         self.corresponding_validate_and_clean_methods.update(
             {"null_character": {"validate": "validate_null_character", "clean": "clean_null_character"}}
@@ -149,7 +151,9 @@ class FPV_Linux(FPV_Base):
         cleaned_path = cleaned_path.replace('\0', '')
 
         if raise_error:
-            cleaned_path_instance = FPV_Linux(cleaned_path)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_Linux(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path

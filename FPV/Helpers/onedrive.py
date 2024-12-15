@@ -5,10 +5,9 @@ class FPV_OneDrive(FPV_Base):
     invalid_characters = FPV_Base.invalid_characters + "#%&*:{}<>?|\""
     max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
 
-    def __init__(self, path: str, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
-        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
-        self.auto_clean = auto_clean
-        self.relative = relative
+    def __init__(self, path: str, **kwargs):
+        super().__init__(path, **kwargs)
+        self.init_kwargs = kwargs
 
         self.restricted_names = {
             ".lock", "CON", "PRN", "AUX", "NUL", 
@@ -68,7 +67,9 @@ class FPV_OneDrive(FPV_Base):
 
         # Revalidate if needed
         if raise_error:
-            cleaned_path_instance = FPV_OneDrive(cleaned_path, auto_clean=False, relative=self.relative)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_OneDrive(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path

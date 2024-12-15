@@ -7,20 +7,20 @@ class TestFPV_Windows:
         reserved_names = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "LPT1"]
         for name in reserved_names:
             with pytest.raises(ValueError) as excinfo:
-                FPV_Windows(f"{name}/folder/file.txt").validate()
+                FPV_Windows(f"{name}/folder/file.txt", sep='/').validate()
             assert f'Restricted name "{name}"' in str(excinfo.value)
 
     def test_invalid_characters(self):
         # Windows path with invalid characters should raise ValueError
         invalid_path = "invalid<>|?*:/path/file.txt"
         with pytest.raises(ValueError) as excinfo:
-            FPV_Windows(invalid_path).validate_invalid_characters()
+            FPV_Windows(invalid_path, sep='/').validate_invalid_characters()
         assert "Invalid character" in str(excinfo.value)
 
     def test_drive_letter_check(self):
         # Windows paths must start with a valid drive letter if `relative` is False
         with pytest.raises(ValueError) as excinfo:
-            FPV_Windows("/InvalidDriveLetter/path", relative=False).validate_drive_letter()
+            FPV_Windows("/InvalidDriveLetter/path", relative=False, sep='/').validate_drive_letter()
         assert "Invalid or missing drive letter" in str(excinfo.value)
 
 

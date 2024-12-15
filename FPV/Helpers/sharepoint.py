@@ -5,10 +5,9 @@ class FPV_SharePoint(FPV_Base):
     # Invalid characters specific to SharePoint, adding "#" to the base invalid characters
     invalid_characters = FPV_Base.invalid_characters + "#"
 
-    def __init__(self, path: str, auto_clean=False, relative=True, sep="/"):
-        super().__init__(path, auto_clean=auto_clean, relative=relative, sep=sep)
-        self.auto_clean = auto_clean
-        self.relative = relative
+    def __init__(self, path: str, **kwargs):
+        super().__init__(path, **kwargs)
+        self.init_kwargs = kwargs
 
         # SharePoint-specific restricted names, prefixes, and root folder
         self.max_length = 400
@@ -68,7 +67,9 @@ class FPV_SharePoint(FPV_Base):
 
         # Revalidate if needed
         if raise_error:
-            cleaned_path_instance = FPV_SharePoint(cleaned_path, auto_clean=False, relative=self.relative)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_SharePoint(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path

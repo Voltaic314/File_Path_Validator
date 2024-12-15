@@ -8,10 +8,9 @@ class FPV_Egnyte(FPV_Base):
     max_length = 5000  # Max path length
     part_length = 245  # Max length per path part
 
-    def __init__(self, path, auto_clean=False, relative=True, sep="/", check_files=True, check_folders=True):
-        super().__init__(path, relative=relative, sep=sep, check_files=check_files, check_folders=check_folders)
-        self.auto_clean = auto_clean
-        self.relative = relative
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
+        self.init_kwargs = kwargs
 
         # Define Egnyte-specific restricted names, suffixes, prefixes
         self.restricted_names = {
@@ -85,7 +84,9 @@ class FPV_Egnyte(FPV_Base):
 
         # Revalidate cleaned path if needed
         if raise_error:
-            cleaned_path_instance = FPV_Egnyte(cleaned_path, auto_clean=False, relative=self.relative)
+            # pop auto clean from kwargs 
+            self.init_kwargs.pop("auto_clean", None)
+            cleaned_path_instance = FPV_Egnyte(cleaned_path, **self.init_kwargs)
             cleaned_path_instance.validate()
 
         return cleaned_path
