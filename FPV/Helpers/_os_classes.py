@@ -24,24 +24,26 @@ class FPV_Windows(FPV_Base):
         if self.auto_clean:
             self.path = self.clean()
 
-    def validate(self):
+    def validate(self, path='', relative=None):
         """Validate the full path for Windows, including Windows-specific validations."""
-        if not self.relative:
-            self.validate_drive_letter()
+        input_path = path if path else self.path
+        check_drive_letter = not self.relative if relative is None else not relative
+        if check_drive_letter:
+            self.validate_drive_letter(path=input_path)
         
-        self.validate_path_length()
-        self.validate_invalid_characters()
-        self.validate_restricted_names()
+        self.validate_path_length(path=input_path)
+        self.validate_invalid_characters(path=input_path)
+        self.validate_restricted_names(path=input_path)
         
         # Validate each part does not end with a period and has no leading/trailing spaces
-        self.validate_if_part_ends_with_period()
-        self.validate_if_whitespace_around_parts()
+        self.validate_if_part_ends_with_period(path=input_path)
+        self.validate_if_whitespace_around_parts(path=input_path)
 
-        self.validate_empty_parts()
+        self.validate_empty_parts(path=input_path)
 
-    def clean(self, raise_error=True):
+    def clean(self, path='', raise_error=True):
         """Clean and return the Windows-compliant path, and validate if raise_error is True."""
-        cleaned_path = self.path
+        cleaned_path = path if path else self.path
         cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
