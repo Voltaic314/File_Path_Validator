@@ -48,17 +48,7 @@ class FPV_Windows(FPV_Base):
         cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
         cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
-        
-        
-        # Remove trailing periods and spaces
-        cleaned_path_parts = []
-        path_parts = cleaned_path.split(self.sep)
-        for part in path_parts:
-            cleaned_part = self.remove_trailing_periods(part)
-            if cleaned_part:
-                cleaned_path_parts.append(cleaned_part)
-        cleaned_path = self.sep.join(cleaned_path_parts)
-
+        cleaned_path= self.remove_trailing_periods(cleaned_path)
         cleaned_path = self.remove_empty_parts(cleaned_path)
         cleaned_path = f"{self.sep}{cleaned_path}" if self.relative else cleaned_path
 

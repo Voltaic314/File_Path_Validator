@@ -199,9 +199,10 @@ class FPV_Base:
                 raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
             check_files_true = index == len(input_path_parts) - 1 and self.check_files
             if '.' in part and check_files_true:
-                for period_part in part.split('.'):
-                    if period_part != period_part.strip():
-                        raise ValueError(f'Leading or trailing spaces are not allowed in: "{period_part}".')
+                before = '.'.join(part.split(".")[:-1])
+                after = part.split(".")[-1]
+                if before != before.strip() or after != after.strip():
+                    raise ValueError(f'Leading or trailing spaces are not allowed around the file extension in: "{part}".')
     
     def remove_whitespace_around_parts(self, path=''):
         """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
@@ -210,7 +211,8 @@ class FPV_Base:
         for index, part in enumerate(input_path_parts):
             part = part.strip()
             if '.' in part and self.check_files and index == len(input_path_parts) - 1:
-                before, after = part.split('.')
+                before = '.'.join(part.split(".")[:-1])
+                after = part.split(".")[-1]
                 part = f"{before.strip()}.{after.strip()}"
             cleaned_parts.append(part)
         return self.sep.join(cleaned_parts)
@@ -218,7 +220,8 @@ class FPV_Base:
     def remove_whitespace_around_part(self, part='', is_file=False):
         """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
         if '.' in part and is_file:
-            before, after = part.split('.')
+            before = '.'.join(part.split(".")[:-1])
+            after = part.split(".")[-1]
             part = f"{before.strip()}.{after.strip()}"
         return part.strip()
 
