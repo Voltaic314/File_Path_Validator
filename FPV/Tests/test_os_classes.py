@@ -1,5 +1,5 @@
 import pytest
-from FPV.Helpers._os_classes import FPV_Windows, FPV_MacOS, FPV_Linux
+from FPV.Helpers.os_classes import FPV_Windows, FPV_MacOS, FPV_Linux
 
 
 class TestFPV_Windows:
