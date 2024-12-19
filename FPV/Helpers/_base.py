@@ -1,121 +1,56 @@
 import re
-from typing import List
+from typing import List, Dict, Optional
+from ._path import Path
 
 class FPV_Base:
     """Base class for path validation and cleaning."""
-    
-    # helpers 
-    @staticmethod
-    def normalize_path(path: str, relative: bool = True, sep='/') -> str:
-        """Normalize the path by replacing backslashes with forward slashes and ensuring it starts with a slash."""
-        path = path.replace("\\", sep).replace("/", sep) # replace all slashes with the sep slashes
-        if not path.startswith(sep):
-            path = f"{sep}{path}" if relative else f"{path}"
-        return path
-    
-    @staticmethod
-    def get_path_parts(path: str, sep='/') -> list:
-        """Get the parts of the path by splitting on forward slashes."""
-        return path.strip(sep).split(sep) if sep in path else [path]
 
-    # Default invalid characters
-    invalid_characters = ''
-    max_length = 0  # Default maximum length
+    # Default configurations
+    invalid_characters = ""
+    max_length = 0
     restricted_names: set = set()
 
-    corresponding_validate_and_clean_methods  = {
-        "path_length": {"validate": "validate_path_length", "clean": "truncate_path"},
-        "restricted_names": {"validate": "validate_restricted_names", "clean": "remove_restricted_names"},
-        "part_ends_with_period": {"validate": "validate_if_part_ends_with_period", "clean": "remove_trailing_periods"},
-        "whitespace_around_parts": {"validate": "validate_if_whitespace_around_parts", "clean": "remove_whitespace_around_parts"},
-        "empty_parts": {"validate": "validate_empty_parts", "clean": "remove_empty_parts"},
-        "invalid_characters": {"validate": "validate_invalid_characters", "clean": "remove_invalid_characters"},
-        "_main": {"validate": "validate", "clean": "clean"}
-    }
+    def __init__(self, path: str, sep: str = '/', auto_clean: bool = False, auto_validate: bool = True):
+        self.path_helper = Path(initial_path=path, sep=sep)
+        self.logs: Dict[str, List[dict]] = {"actions": [], "issues": []}
 
-    def __init__(self, path: str, auto_clean: bool = False, relative: bool = True, check_folders=True, check_files=True, sep='/'):
-        self.original_path: str = path
-        self.sep: str = sep
-        self.path: str = FPV_Base.normalize_path(path, relative, sep=self.sep)
-        self.path_parts: List[str] = FPV_Base.get_path_parts(self.path) 
-        self.relative: bool = relative
-        self.check_folders: bool = check_folders
-        self.check_files: bool = check_files
-        self.auto_clean: bool = auto_clean
-        self.init_kwargs = {
-            "auto_clean": self.auto_clean,
-            "relative": self.relative,
-            "check_folders": self.check_folders,
-            "check_files": self.check_files,
-            "sep": self.sep
+        if auto_clean:
+            self.clean()
+        if auto_validate:
+            self.validate()
+
+    def add_action_or_issue(self, kind: str, subtype: str, details: dict, reason: Optional[str] = None):
+        """Log an action or issue."""
+        log_entry = {
+            "kind": kind,  # "action" or "issue"
+            "subtype": subtype,
+            "details": details,
+            "reason": reason or "No reason provided.",
         }
+        self.logs[kind + "s"].append(log_entry)
 
-        if self.auto_clean:
-            self.path = self.clean()
+    def process_invalid_characters(self, action: str):
+        """Process invalid characters based on the specified action."""
+        for i, part in enumerate(self.path_helper.parts):
+            invalid_chars = [char for char in part if char in self.invalid_characters]
+            if invalid_chars:
+                if action == "validate":
+                    self.add_action_or_issue(
+                        kind="issue",
+                        subtype="INVALID_CHAR",
+                        details={"part": part, "invalid_chars": invalid_chars},
+                        reason=f"Invalid characters {invalid_chars} found in part: '{part}'.",
+                    )
+                elif action == "clean":
+                    cleaned_part = ''.join(char for char in part if char not in self.invalid_characters)
+                    self.add_action_or_issue(
+                        kind="action",
+                        subtype="INVALID_CHAR",
+                        details={"original": part, "new_value": cleaned_part},
+                        reason="Removed invalid characters.",
+                    )
+                    self.path_helper.set_part(i, cleaned_part)
 
-    def get_validate_or_clean_method(self, method: str, action: str, **kwargs):
-        """
-        The purpose of this method is to return the appropriate 
-        validate or clean method based on the method and action passed.
-        If you pass in "clean" as your action argument then you need to also pass in the "path" argument.
-
-        Args:
-            method (str): The name of the validate/clean method pair to use.
-            action (str): The action to perform, either "validate" or "clean".
-            **kwargs: Additional keyword arguments to pass to the method.
-
-        Returns:
-        if action == "validate":
-            bool: The result of the validation.
-        elif action == "clean":
-            str: The cleaned path.
-        """
-        return getattr(self, self.corresponding_validate_and_clean_methods[method][action], **kwargs)
-    
-    def clean_and_validate_path(self, method: str, raise_error: bool = False, **kwargs):
-        """
-        Clean the path with the specified clean method, then optionally validate.
-        
-        Args:
-            method (str): The name of the validate/clean method pair to use.
-            raise_error (bool): Whether to raise an error if the cleaned path is still invalid.
-
-        Returns:
-            str: The cleaned path.
-        """
-        # Call the clean method
-        clean_method = self.get_validate_or_clean_method(method, "clean")
-        cleaned_path = clean_method(**kwargs)
-
-        # If raise_error is set, validate the cleaned path
-        if raise_error:
-            # Create a new instance of the current class with the cleaned path
-            cleaned_instance = self.__class__(path=cleaned_path, **self.init_kwargs)
-            # should we call the specific validate method or validate the whole thing? 
-            # Hmm....... I guess we'll just validate the whole thing for now.
-            validate_method = self.get_validate_or_clean_method(method, "validate")
-            cleaned_instance.validate()
-
-        return cleaned_path
-
-    def path_part_contains_invalid_characters(self, part):
-        invalid_pattern = re.compile(f"[{re.escape(self.invalid_characters)}]")
-        return re.search(invalid_pattern, part)
-
-    def validate_invalid_characters(self, path=''):
-        """Validate for invalid characters in each part of the path and report specific invalid characters."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        for index, part in enumerate(input_path_parts):
-            # if not relative and current windows in current class name.lower() then skip the first part.
-            if not self.relative and "windows" in self.__class__.__name__.lower():
-                if index == 0:
-                    continue # this is handled in the windows sub class but it gives false positives here if this isn't here.
-            match = self.path_part_contains_invalid_characters(part)
-            if match:
-                raise ValueError(
-                    f'Invalid character "{match.group()}" found in part: "{part}". '
-                    f'Please ensure the path does not contain any of the following characters: {self.invalid_characters}'
-                )
 
     def remove_invalid_characters(self, path=''):
         """Remove invalid characters from each part of the path and return the cleaned path."""
