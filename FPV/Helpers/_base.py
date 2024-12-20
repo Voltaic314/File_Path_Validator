@@ -1,4 +1,4 @@
-import re
+import json
 from typing import List, Dict, Optional
 from ._path import Path
 
@@ -11,171 +11,259 @@ class FPV_Base:
     restricted_names: set = set()
 
     def __init__(self, path: str, sep: str = '/', auto_clean: bool = False, auto_validate: bool = True):
-        self.path_helper = Path(initial_path=path, sep=sep)
-        self.logs: Dict[str, List[dict]] = {"actions": [], "issues": []}
+        self._path_helper = Path(initial_path=path, sep=sep)
 
         if auto_clean:
             self.clean()
         if auto_validate:
             self.validate()
 
-    def add_action_or_issue(self, kind: str, subtype: str, details: dict, reason: Optional[str] = None):
-        """Log an action or issue."""
-        log_entry = {
-            "kind": kind,  # "action" or "issue"
-            "subtype": subtype,
-            "details": details,
-            "reason": reason or "No reason provided.",
-        }
-        self.logs[kind + "s"].append(log_entry)
+    def get_logs(self) -> Dict[str, List[dict]]:
+        """Retrieve logs from Path helper."""
+        return self._path_helper.get_logs()
+    
+    def add_part(self, part: str, is_file: bool = False, mode: str = "validate"):
+        """Add a new part to the path and process it."""
+        self._path_helper.add_part(part, is_file=is_file)
+        if mode.lower() == "validate":
+            self.validate()  # Revalidate the path after addition
+        elif mode.lower() == "clean":
+            self.clean()
+
+    def remove_part(self, index: int, mode: str = "validate"):
+        """Remove a part from the path and revalidate."""
+        self._path_helper.remove_part(index)
+        if mode.lower() == "validate":
+            self.validate()  # Revalidate the path after removal
+        elif mode.lower() == "clean":
+            self.clean()
 
     def process_invalid_characters(self, action: str):
         """Process invalid characters based on the specified action."""
-        for i, part in enumerate(self.path_helper.parts):
+        for i, part in enumerate(self._path_helper.parts):
+            # Delegate root folder logic to subclasses if path is absolute
+            if not self._path_helper.relative and i == 0:
+                self.process_root_folder_format(part, action)
+                continue
+
+            # Find invalid characters in the current part
             invalid_chars = [char for char in part if char in self.invalid_characters]
             if invalid_chars:
                 if action == "validate":
-                    self.add_action_or_issue(
-                        kind="issue",
-                        subtype="INVALID_CHAR",
-                        details={"part": part, "invalid_chars": invalid_chars},
-                        reason=f"Invalid characters {invalid_chars} found in part: '{part}'.",
+                    self._path_helper.add_issue(
+                        {
+                            "type": "issue",
+                            "category": "INVALID_CHAR",
+                            "details": {"part": part, "invalid_chars": invalid_chars},
+                            "reason": f"Invalid characters {invalid_chars} found in part: '{part}'.",
+                        }
                     )
                 elif action == "clean":
                     cleaned_part = ''.join(char for char in part if char not in self.invalid_characters)
-                    self.add_action_or_issue(
-                        kind="action",
-                        subtype="INVALID_CHAR",
-                        details={"original": part, "new_value": cleaned_part},
-                        reason="Removed invalid characters.",
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "INVALID_CHAR",
+                            "subtype": "MODIFY",
+                            "details": {"original": part, "new_value": cleaned_part},
+                            "reason": "Removed invalid characters.",
+                        },
+                        priority=2  # Priority for invalid character cleanups
                     )
-                    self.path_helper.set_part(i, cleaned_part)
 
+    def process_root_folder_format(self, root: str, action: str):
+        """
+        Placeholder for subclasses to process the root folder format.
+        Subclasses should implement this method to handle absolute paths' root part.
+        """
+        raise NotImplementedError("Subclasses must implement the 'process_root_folder_format' method.")
 
-    def remove_invalid_characters(self, path=''):
-        """Remove invalid characters from each part of the path and return the cleaned path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        cleaned_parts = []
-        for index, part in enumerate(input_path_parts):
+    def process_path_length(self, action: str):
+        """Process path length based on the specified action."""
+        full_path = self._path_helper.get_full_path()
+        current_length = len(full_path)
 
-            # this is some ugly hard coded bullshit if I'm being honest lol
-            if not self.relative and "windows" in self.__class__.__name__.lower():
-                if index == 0:
-                    self.invalid_characters = self.invalid_characters.replace(":", "")
-                else:
-                    self.invalid_characters = self.invalid_characters + ':' if ':' not in self.invalid_characters else self.invalid_characters
-            
-            cleaned_part = re.sub(f"[{re.escape(self.invalid_characters)}]", "", part)
-            if cleaned_part:  # Only add non-empty parts
-                cleaned_parts.append(cleaned_part)
-        output_path = self.sep.join(cleaned_parts)
-        return output_path
+        if current_length > self.max_length:
+            priority = 1  # Higher priority for path length operations
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "PATH_LENGTH",
+                        "details": {"current_length": current_length, "max_length": self.max_length},
+                        "reason": f"Path exceeds maximum length of {self.max_length} characters.",
+                    }
+                )
+            elif action == "clean":
+                cumulative_length = 0
 
-    def validate_path_length(self, path=''):
-        """validate if the path length exceeds the maximum allowed."""
-        input_path = self.path if not path else path
-        if self.max_length and len(input_path) > self.max_length:
-            raise ValueError(f"The specified path is too long. Maximum allowed is {self.max_length} characters.")
+                for i, part in enumerate(self._path_helper.parts):
+                    part_length = len(part)
+                    separator_length = 1 if i > 0 else 0  # Account for separator between parts
 
-    def truncate_path(self, path='', check_files=True):
-        """Truncate the path length to meet the maximum length requirement."""
-        input_path = self.path if not path else path
-        if len(input_path) <= self.max_length:
-            return input_path
-        
-        # Use as much of the filename as possible but raise if the filename alone exceeds max length
-        if check_files:
-            filename = input_path.split(self.sep)[-1]
-            filename_length = len(filename)
-            if filename_length > self.max_length:
-                raise ValueError(f"The filename is too long. Maximum allowed is {self.max_length} characters.")
+                    # If adding this part exceeds max length, mark it for removal
+                    if cumulative_length + part_length + separator_length > self.max_length:
+                        self._path_helper.add_action(
+                            {
+                                "type": "action",
+                                "category": "PATH_LENGTH",
+                                "subtype": "REMOVE",
+                                "details": {"part": part, "index": i},
+                                "reason": f"Marked part '{part}' for removal due to exceeding path length limit.",
+                            },
+                            priority=priority
+                        )
+                    else:
+                        cumulative_length += part_length + separator_length
 
-            # Calculate maximum usable path length minus filename
-            max_path_length = self.max_length - filename_length - 1
-            truncated_path = path[:max_path_length]
-            
-            return f"{self.sep}{truncated_path.strip(self.sep)}{self.sep}{filename.strip(self.sep)}"
-        else:
-            # just truncate it to the max length after stripping for / signs
-            return f"{self.sep}{input_path.strip(self.sep)[:self.max_length]}"
+    def process_restricted_names(self, action: str):
+        """Process restricted names based on the specified action."""
+        for i, part in enumerate(self._path_helper.parts):
+            # Check if the part is a restricted name
+            if part.lower() in [name.lower() for name in self.restricted_names]:
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "type": "issue",
+                            "category": "RESTRICTED_NAME",
+                            "subtype": "REPORT",
+                            "details": {"part": part},
+                            "reason": f"Restricted name '{part}' found in path.",
+                        }
+                    )
+                elif action == "clean":
+                    self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "RESTRICTED_NAME",
+                        "subtype": "REMOVE",
+                        "priority": 2,  # Priority for restricted names processing
+                        "details": {"part": part, "index": i},
+                        "reason": f"Removed restricted name '{part}' to avoid conflicts.",
+                    }
+                )
 
-    def validate_restricted_names(self, path=''):
-        """validate for restricted names in each part of the path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        for part in input_path_parts:
-            if part.lower() in [s.lower() for s in self.restricted_names]:
-                raise ValueError(f'Restricted name "{part}" found in path.')
-
-    def remove_restricted_names(self, path=''):
-        """Remove restricted names from each part of the path and return the cleaned path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        cleaned_parts = [part for part in input_path_parts if part not in self.restricted_names]
-        ouput_path = self.sep.join(cleaned_parts)
-        return ouput_path
-
-    def validate_if_part_ends_with_period(self, path=''):
-        """validate if any part of the path ends with a period."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        for part in input_path_parts:
+    def process_trailing_periods(self, action: str):
+        """Process trailing periods in path parts based on the specified action."""
+        for i, part in enumerate(self._path_helper.parts):
             if part.endswith('.'):
-                raise ValueError(f'"{part}" cannot end with a period.')
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "type": "issue",
+                            "category": "TRAILING_PERIOD",
+                            "subtype": "REPORT",
+                            "details": {"part": part, "index": i},
+                            "reason": f"The part '{part}' ends with a trailing period, which is not allowed.",
+                        }
+                    )
+                elif action == "clean":
+                    cleaned_part = part.rstrip('.')
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "TRAILING_PERIOD",
+                            "subtype": "MODIFY",
+                            "priority": 3,  # Priority for processing trailing periods
+                            "details": {"original": part, "new_value": cleaned_part, "index": i},
+                            "reason": f"Removed trailing period from '{part}'.",
+                        }
+                    )
 
-    def remove_trailing_periods(self, path=''):
-        """Remove trailing periods from each part of the path and return the cleaned path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        cleaned_parts = [part.rstrip('.') for part in input_path_parts if part.rstrip('.')]
-        return self.sep.join(cleaned_parts)
+    def process_whitespace(self, action: str):
+        """
+        Process leading/trailing whitespace in each part of the path, including around file extensions.
+        """
+        for i, part in enumerate(self._path_helper.parts):
+            is_file = self._path_helper.file_added and i == len(self._path_helper.parts) - 1
 
-    def validate_if_whitespace_around_parts(self, path=''):
-        """validate if there are leading or trailing spaces in any part of the path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        for index, part in enumerate(input_path_parts):
-            if part != part.strip():
-                raise ValueError(f'Leading or trailing spaces are not allowed in: "{part}".')
-            check_files_true = index == len(input_path_parts) - 1 and self.check_files
-            if '.' in part and check_files_true:
-                before = '.'.join(part.split(".")[:-1])
-                after = part.split(".")[-1]
-                if before != before.strip() or after != after.strip():
-                    raise ValueError(f'Leading or trailing spaces are not allowed around the file extension in: "{part}".')
+            # Remove leading/trailing whitespace
+            cleaned_part = part.strip()
+
+            # Handle whitespace around file extensions if part is a file
+            if is_file and '.' in cleaned_part:
+                name, ext = '.'.join(cleaned_part.split('.')[:-1]).strip(), cleaned_part.split('.')[-1].strip()
+                cleaned_part = f"{name}.{ext}"
+
+            # Check if the part was modified
+            if part != cleaned_part:
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "category": "WHITESPACE",
+                            "subtype": "MODIFY",
+                            "details": {"part": part, "index": i},
+                            "reason": (
+                                f"Whitespace detected in part: '{part}'. "
+                                f"Leading/trailing whitespace or whitespace around file extension removed."
+                            ),
+                        }
+                    )
+                elif action == "clean":
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "WHITESPACE",
+                            "subtype": "MODIFY",
+                            "priority": 2,
+                            "details": {"original": part, "new_value": cleaned_part},
+                            "reason": "Removed whitespace from part of path.",
+                        }
+                    )
+
+    def process_empty_parts(self, action: str):
+        """
+        Process empty parts in the path based on the specified action.
+        """
+        for i, part in enumerate(self._path_helper.parts):
+            if part == "":
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "category": "EMPTY_PART",
+                            "subtype": "REMOVE",
+                            "details": {"index": i},
+                            "reason": f"Empty part found at index {i} in the path.",
+                        }
+                    )
+                elif action == "clean":
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "EMPTY_PART",
+                            "subtype": "REMOVE",
+                            "priority": 1,
+                            "details": {"index": i},
+                            "reason": f"Removed empty part at index {i} from the path.",
+                        }
+                    )
+
     
-    def remove_whitespace_around_parts(self, path=''):
-        """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        cleaned_parts = []
-        for index, part in enumerate(input_path_parts):
-            part = part.strip()
-            if '.' in part and self.check_files and index == len(input_path_parts) - 1:
-                before = '.'.join(part.split(".")[:-1])
-                after = part.split(".")[-1]
-                part = f"{before.strip()}.{after.strip()}"
-            cleaned_parts.append(part)
-        return self.sep.join(cleaned_parts)
-                    
-    def remove_whitespace_around_part(self, part='', is_file=False):
-        """Remove leading and trailing spaces from each part of the path and return the cleaned path."""
-        if '.' in part and is_file:
-            before = '.'.join(part.split(".")[:-1])
-            after = part.split(".")[-1]
-            part = f"{before.strip()}.{after.strip()}"
-        return part.strip()
+    def clean(self):
+        """
+        Apply all queued actions from the Path helper to clean the path.
+        """
+        self._path_helper.apply_actions()  # Clean the path by applying queued actions
+        return self.get_full_path()
 
-    def validate_empty_parts(self, path=''):
-        """validate for empty parts in the path."""
-        input_path = self.path if not path else path
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        if '' in input_path_parts:
-            raise ValueError('Empty parts are not allowed in the path.')
+    def validate(self):
+        """
+        Validate the path by checking for issues and raising a ValueError if any exist.
+        """
+        issues = self._path_helper.get_logs()["issues"]
+        path_length_issues = [issue for issue in issues if issue["category"] == "PATH_LENGTH"]
+        if not path_length_issues:
+            # check it once more
+            self.process_path_length("validate")
+        if issues:
+            # Raise a ValueError with a JSON dump of the issues
+            raise ValueError(
+                "Validation failed with the following issues:\n" + json.dumps(issues, indent=4)
+            )
+        return True  # If no issues, validation passed
 
-    def remove_empty_parts(self, path=''):
-        """Remove any empty parts in the path and return the cleaned path."""
-        input_path_parts = self.path_parts if not path else FPV_Base.get_path_parts(path, sep=self.sep)
-        cleaned_parts = [part for part in input_path_parts if part]
-        output_path = self.sep.join(cleaned_parts)
-        return output_path
-
-    def validate(self, path=''):
-        return True
-
-    def clean(self, raise_error=True, path=''):
-        return self.path
+    def get_full_path(self) -> str:
+        """
+        Retrieve the full path after applying all actions.
+        """
+        return self._path_helper.get_full_path()
