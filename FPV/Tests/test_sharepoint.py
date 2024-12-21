@@ -32,7 +32,7 @@ def test_sharepoint_restricted_root_folder():
 def test_sharepoint_clean_path():
     # Test that SharePoint cleaning handles specific restricted elements properly
     path = "~$temp/.lock/forms/folder"
-    sharepoint = FPV_SharePoint(path, auto_clean=False)
+    sharepoint = FPV_SharePoint(path)
     cleaned_path = sharepoint.clean()
 
     # Assert that restricted elements have been removed or adjusted

@@ -16,9 +16,6 @@ class FPV_Box(FPV_Base):
     def __init__(self, path: str, **kwargs):
         super().__init__(path, **kwargs)
 
-        if self.auto_clean:
-            self.clean()
-
     def validate(self):
         """Validate the path for Box-specific rules, ignoring OS-specific restrictions."""
         self.process_path_length(action="validate")

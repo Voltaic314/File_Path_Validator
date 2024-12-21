@@ -33,7 +33,7 @@ def test_onedrive_restricted_root_folder():
 def test_onedrive_clean_path():
     # Example path with mixed violations for OneDrive
     path = "~$temp/.lock/forms/folder/invalid#chars.txt"
-    onedrive = FPV_OneDrive(path, auto_clean=False)
+    onedrive = FPV_OneDrive(path)
     cleaned_path = onedrive.clean()
 
     # Assertions for cleaned path to ensure it is OneDrive-compliant

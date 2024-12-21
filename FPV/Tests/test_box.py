@@ -30,7 +30,7 @@ def test_box_clean_whitespace_around_parts():
 def test_box_clean_path():
     """Test the clean method, ensuring the path becomes Box-compliant."""
     path = "outlook.pst/folder/ test file .txt "
-    box_validator = FPV_Box(path, auto_clean=False)
+    box_validator = FPV_Box(path)
     cleaned_path = box_validator.clean()
 
     # Check that restricted names are removed
@@ -47,11 +47,3 @@ def test_box_no_invalid_characters():
     with pytest.raises(ValueError) as excinfo:
         FPV_Box(path_with_invalid_chars).validate()
     assert "Invalid character" in str(excinfo.value)
-
-def test_box_auto_clean():
-    """Test that enabling auto_clean automatically cleans the path upon initialization."""
-    unclean_path = "outlook.pst/folder/ test file .txt "
-    box_validator = FPV_Box(unclean_path, auto_clean=True)
-    
-    # Check that the path has been cleaned automatically
-    assert box_validator.path == "/folder/test file.txt"

@@ -86,7 +86,7 @@ def test_egnyte_temp_patterns():
 def test_egnyte_clean_path():
     # Example path with mixed violations, e.g., invalid characters, restricted prefixes, suffixes, and names
     path = "._ds_store/temp_folder_name_with_.docx"
-    egnyte = FPV_Egnyte(path, auto_clean=False)
+    egnyte = FPV_Egnyte(path)
     egnyte.max_length = 5000
     egnyte.part_length = 245
     cleaned_path = egnyte.clean()

@@ -12,36 +12,22 @@ class FPV_Windows(FPV_Base):
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", 
         "LPT6", "LPT7", "LPT8", "LPT9"
     }
-    acceptable_root_patterns = [r"^[A-Za-z]:\\$", r"^[A-Za-z]:/$"]
+    acceptable_root_patterns = [r"^[A-Za-z]:$", r"^[A-Za-z]:\\$"]
 
     def __init__(self, path, **kwargs):
-        super().__init__(path, **kwargs)
+        super().__init__(path, sep="\\", **kwargs)
 
-    def validate(self):
-        """Validate the full path for Windows, including Windows-specific validations."""
-        self.process_path_length(action="validate")
-        self.process_invalid_characters(action="validate")
-        self.process_restricted_names(action="validate")
-        self.process_whitespace(action="validate")
-        self.process_empty_parts(action="validate")
-        self.process_trailing_periods(action="validate")
-        self.process_root_folder_format(self._path_helper.parts[0], action="validate")
-        return super().validate()
-
-    def clean(self, raise_error=True):
-        """Clean and return the Windows-compliant path, validating if raise_error is True."""
-        self.process_path_length(action="clean")
-        self.process_invalid_characters(action="clean")
-        self.process_restricted_names(action="clean")
-        self.process_whitespace(action="clean")
-        self.process_empty_parts(action="clean")
-        self.process_trailing_periods(action="clean")
-        self.process_root_folder_format(self._path_helper.parts[0], action="clean")
-
-        if raise_error:
-            self.validate()
-
-        return super().clean()
+    def processing_methods(self):
+        """Define the processing methods for Windows paths."""
+        return [
+            lambda part, action: self.process_root_folder_format(part, action),
+            lambda part, action: self.process_invalid_characters(part, action),
+            lambda part, action: self.process_restricted_names(part, action),
+            lambda part, action: self.process_whitespace(part, action),
+            lambda part, action: self.process_empty_parts(part, action),
+            lambda part, action: self.process_trailing_periods(part, action),
+            lambda part, action: self.process_path_length(part, action),
+        ]
 
 
 class FPV_MacOS(FPV_Base):

@@ -59,7 +59,7 @@ def main():
         print(f"Validation Error: {e}")
 
     # Auto-clean the path upon creating the validator object
-    validator_auto_clean = FPV_Windows(example_path, auto_clean=True, relative=True)
+    validator_auto_clean = FPV_Windows(example_path, relative=True)
     print("Automatically Cleaned Path:", validator_auto_clean.path)
 
     ## instantiate more objects... As many as you need to see the validation for each. :)

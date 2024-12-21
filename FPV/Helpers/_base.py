@@ -12,15 +12,13 @@ class FPV_Base:
     restricted_names: set = set()
     acceptable_root_patterns: List[str] = []
 
-    def __init__(self, path: str, sep: str = '/', auto_clean: bool = False, auto_validate: bool = True, relative: bool = True):
-        self._path_helper = Path(initial_path=path, sep=sep, relative=relative)
-        self.auto_clean = auto_clean
+    def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, relative: bool = True, file_added: bool = False):
+        self._path_helper = Path(initial_path=path, sep=sep, relative=relative, file_added=file_added)
         self.auto_validate = auto_validate
         self.sep = sep
+        self.file_added = file_added
         self.path = self._path_helper.get_full_path()
 
-        if self.auto_clean:
-            self.clean()
         if self.auto_validate:
             self.validate()
 
@@ -54,47 +52,45 @@ class FPV_Base:
         # Always check path length after modification
         self.process_path_length(action="validate" if mode == "validate" else "clean")
 
-    def process_invalid_characters(self, action: str):
-        """Process invalid characters based on the specified action."""
-        for i, part in enumerate(self._path_helper.parts):
-            # Delegate root folder logic to subclasses if path is absolute
-            if not self._path_helper.relative and i == 0:
-                self.process_root_folder_format(part, action)
-                continue
+    def process_invalid_characters(self, part: dict, action: str):
+        """Process invalid characters for a specific part based on the specified action."""
+        part_str = part["part"]
+        index = part["index"]
+        invalid_chars = [char for char in part_str if char in self.invalid_characters]
 
-            # Find invalid characters in the current part
-            invalid_chars = [char for char in part if char in self.invalid_characters]
-            if invalid_chars:
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "INVALID_CHAR",
-                            "details": {"part": part, "invalid_chars": invalid_chars},
-                            "reason": f"Invalid characters {invalid_chars} found in part: '{part}'.",
-                        }
-                    )
-                elif action == "clean":
-                    cleaned_part = ''.join(char for char in part if char not in self.invalid_characters)
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "INVALID_CHAR",
-                            "subtype": "MODIFY",
-                            "details": {"original": part, "new_value": cleaned_part},
-                            "reason": "Removed invalid characters.",
-                        },
-                        priority=2  # Priority for invalid character cleanups
-                    )
+        if invalid_chars:
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "INVALID_CHAR",
+                        "details": {"part": part_str, "invalid_chars": invalid_chars, "index": index},
+                        "reason": f"Invalid characters {invalid_chars} found in part: '{part_str}'.",
+                    }
+                )
+            elif action == "clean":
+                cleaned_part = ''.join(char for char in part_str if char not in self.invalid_characters)
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "INVALID_CHAR",
+                        "subtype": "MODIFY",
+                        "details": {"original": part_str, "new_value": cleaned_part, "index": index},
+                        "reason": "Removed invalid characters.",
+                    },
+                    priority=2
+                )
+                return cleaned_part  # Return the cleaned part to replace the original
+        return part_str
 
-    def process_root_folder_format(self, root: str, action: str):
+    def process_root_folder_format(self, part: dict, action: str):
         """Process the root folder format based on acceptable patterns."""
-        if not self.acceptable_root_patterns:
-            raise NotImplementedError(
-                "Subclasses must define acceptable_root_patterns to validate root formats."
-            )
+        part_str = part["part"]
+        index = part["index"]
+        if self._path_helper.relative or index != 0:
+            return part_str
 
-        valid = any(re.match(pattern, root) for pattern in self.acceptable_root_patterns)
+        valid = any(re.match(pattern, part_str) for pattern in self.acceptable_root_patterns)
 
         if not valid:
             if action == "validate":
@@ -102,8 +98,8 @@ class FPV_Base:
                     {
                         "type": "issue",
                         "category": "ROOT_FORMAT",
-                        "details": {"root": root},
-                        "reason": f"Root '{root}' does not match any acceptable pattern: {self.acceptable_root_patterns}.",
+                        "details": {"root": part_str},
+                        "reason": f"Root '{part_str}' does not match any acceptable pattern: {self.acceptable_root_patterns}.",
                     }
                 )
             elif action == "clean":
@@ -112,188 +108,255 @@ class FPV_Base:
                         "type": "action",
                         "category": "ROOT_FORMAT",
                         "subtype": "REMOVE",
-                        "priority": 0,
-                        "details": {"part": root},
+                        "details": {"part": part_str},
                         "reason": "Removed invalid root folder.",
-                    }
+                    },
+                    priority=0
                 )
+                return ''  # Return empty string to remove the part
+        return part_str
 
-    def process_path_length(self, action: str):
-        """Process path length based on the specified action."""
-        if not self._path_helper.check_path_length(self.max_length):
-            return  # Skip if within the limit
+    def process_path_length(self, part: dict, action: str):
+        """Process part or overall path length based on the specified action."""
+        part_str = part["part"]
+        index = part["index"]
+        current_length = self._path_helper.path_length
+        part_length = len(part_str)
 
-        if action == "validate":
+        if action == "validate" and current_length + part_length + len(self.sep) > self.max_length:
             self._path_helper.add_issue(
                 {
                     "type": "issue",
                     "category": "PATH_LENGTH",
-                    "details": {"current_length": self._path_helper.path_length, "max_length": self.max_length},
+                    "details": {"current_length": current_length, "max_length": self.max_length},
                     "reason": f"Path exceeds maximum length of {self.max_length} characters.",
                 }
             )
         elif action == "clean":
-            cumulative_length = 0
+            remaining_length = self.max_length - (current_length - len(part_str))
+            if remaining_length < 0:
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "PATH_LENGTH",
+                        "subtype": "REMOVE",
+                        "details": {"index": index, "part": part_str},
+                        "reason": f"Removed '{part_str}' to reduce path length to within {self.max_length} characters.",
+                    },
+                    priority=1
+                )
+                return ''  # Return empty string to remove the part
+            elif remaining_length < len(part_str):
+                truncated_part = part_str[:remaining_length]
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "PATH_LENGTH",
+                        "subtype": "MODIFY",
+                        "details": {"original": part_str, "new_value": truncated_part, "index": index},
+                        "reason": f"Truncated '{part_str}' to '{truncated_part}' to reduce path length.",
+                    },
+                    priority=1
+                )
+                return truncated_part  # Return the truncated part to replace the original
+        return part_str
 
-            for i, part in enumerate(self._path_helper.parts):
-                part_length = len(part)
-                separator_length = 1 if i > 0 else 0
-
-                if cumulative_length + part_length + separator_length > self.max_length:
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "PATH_LENGTH",
-                            "subtype": "REMOVE",
-                            "details": {"part": part, "index": i},
-                            "reason": f"Marked part '{part}' for removal due to exceeding path length limit.",
-                        },
-                        priority=1
-                    )
-                else:
-                    cumulative_length += part_length + separator_length
-
-    def process_restricted_names(self, action: str):
-        """Process restricted names based on the specified action."""
-        for i, part in enumerate(self._path_helper.parts):
-            # Check if the part is a restricted name
-            if part.lower() in [name.lower() for name in self.restricted_names]:
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "RESTRICTED_NAME",
-                            "subtype": "REPORT",
-                            "details": {"part": part},
-                            "reason": f"Restricted name '{part}' found in path.",
-                        }
-                    )
-                elif action == "clean":
-                    self._path_helper.add_action(
+    def process_restricted_names(self, part: dict, action: str):
+        """Process restricted names for a specific part based on the specified action."""
+        part_str = part["part"]
+        index = part["index"]
+        if part_str.lower() in [name.lower() for name in self.restricted_names]:
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "RESTRICTED_NAME",
+                        "details": {"part": part_str, "index": index},
+                        "reason": f"Restricted name '{part_str}' found in path.",
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
                     {
                         "type": "action",
                         "category": "RESTRICTED_NAME",
                         "subtype": "REMOVE",
-                        "priority": 2,  # Priority for restricted names processing
-                        "details": {"part": part, "index": i},
-                        "reason": f"Removed restricted name '{part}' to avoid conflicts.",
+                        "details": {"index": index, "part": part_str},
+                        "reason": f"Removed restricted name '{part_str}' to avoid conflicts.",
+                    },
+                    priority=2
+                )
+                return ''  # Return empty string to remove the part
+        return part_str
+
+    def process_trailing_periods(self, part: dict, action: str):
+        """Process trailing periods for a specific part based on the specified action."""
+        part_str = part["part"]
+        index = part["index"]
+        if part_str.endswith('.'):
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "TRAILING_PERIOD",
+                        "details": {"part": part_str, "index": index},
+                        "reason": f"The part '{part_str}' ends with a trailing period.",
                     }
                 )
+            elif action == "clean":
+                cleaned_part = part_str.rstrip('.')
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "TRAILING_PERIOD",
+                        "subtype": "MODIFY",
+                        "details": {"original": part_str, "new_value": cleaned_part, "index": index},
+                        "reason": "Removed trailing period.",
+                    },
+                    priority=3
+                )
+                return cleaned_part  # Return the cleaned part to replace the original
+        return part_str
 
-    def process_trailing_periods(self, action: str):
-        """Process trailing periods in path parts based on the specified action."""
-        for i, part in enumerate(self._path_helper.parts):
-            if part.endswith('.'):
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "TRAILING_PERIOD",
-                            "subtype": "REPORT",
-                            "details": {"part": part, "index": i},
-                            "reason": f"The part '{part}' ends with a trailing period, which is not allowed.",
-                        }
-                    )
-                elif action == "clean":
-                    cleaned_part = part.rstrip('.')
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "TRAILING_PERIOD",
-                            "subtype": "MODIFY",
-                            "priority": 3,  # Priority for processing trailing periods
-                            "details": {"original": part, "new_value": cleaned_part, "index": i},
-                            "reason": f"Removed trailing period from '{part}'.",
-                        }
-                    )
+    def process_whitespace(self, part: dict, action: str):
+        """Process leading/trailing whitespace in a specific part, including file extensions."""
+        part_str = part["part"]
+        index = part["index"]
+        is_file = part.get("is_file", False)
+        cleaned_part = part_str.strip()
 
-    def process_whitespace(self, action: str):
-        """
-        Process leading/trailing whitespace in each part of the path, including around file extensions.
-        """
-        for i, part in enumerate(self._path_helper.parts):
-            is_file = self._path_helper.file_added and i == len(self._path_helper.parts) - 1
+        if is_file and '.' in cleaned_part:
+            name, ext = '.'.join(cleaned_part.split('.')[:-1]).strip(), cleaned_part.split('.')[-1].strip()
+            cleaned_part = f"{name}.{ext}"
 
-            # Remove leading/trailing whitespace
-            cleaned_part = part.strip()
+        if part != cleaned_part:
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "WHITESPACE",
+                        "details": {"part": part_str, "index": index},
+                        "reason": "Whitespace detected in path part.",
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "WHITESPACE",
+                        "subtype": "MODIFY",
+                        "details": {"original": part_str, "new_value": cleaned_part, "index": index},
+                        "reason": "Removed whitespace.",
+                    },
+                    priority=2
+                )
+                return cleaned_part  # Return the cleaned part to replace the original
+        return part_str
 
-            # Handle whitespace around file extensions if part is a file
-            if is_file and '.' in cleaned_part:
-                name, ext = '.'.join(cleaned_part.split('.')[:-1]).strip(), cleaned_part.split('.')[-1].strip()
-                cleaned_part = f"{name}.{ext}"
-
-            # Check if the part was modified
-            if part != cleaned_part:
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "category": "WHITESPACE",
-                            "subtype": "MODIFY",
-                            "details": {"part": part, "index": i},
-                            "reason": (
-                                f"Whitespace detected in part: '{part}'. "
-                                f"Leading/trailing whitespace or whitespace around file extension removed."
-                            ),
-                        }
-                    )
-                elif action == "clean":
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "WHITESPACE",
-                            "subtype": "MODIFY",
-                            "priority": 2,
-                            "details": {"original": part, "new_value": cleaned_part},
-                            "reason": "Removed whitespace from part of path.",
-                        }
-                    )
-
-    def process_empty_parts(self, action: str):
-        """
-        Process empty parts in the path based on the specified action.
-        """
-        for i, part in enumerate(self._path_helper.parts):
-            if part == "":
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "EMPTY_PART",
-                            "subtype": "REMOVE",
-                            "details": {"index": i},
-                            "reason": f"Empty part found at index {i} in the path.",
-                        }
-                    )
-                elif action == "clean":
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "EMPTY_PART",
-                            "subtype": "REMOVE",
-                            "priority": 1,
-                            "details": {"index": i},
-                            "reason": f"Removed empty part at index {i} from the path.",
-                        }
-                    )
+    def process_empty_parts(self, part: dict, action: str):
+        """Process empty parts in the path."""
+        part_str = part["part"]
+        index = part["index"]
+        part_is_file = part.get("is_file", False)
+        if part_str == "":
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "EMPTY_PART",
+                        "details": {"index": index},
+                        "reason": "Empty part found in the path.",
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "EMPTY_PART",
+                        "subtype": "REMOVE",
+                        "details": {"index": index},
+                        "reason": "Removed empty part.",
+                    },
+                    priority=1
+                )
+                return ''  # Return empty string to remove the part
+        return part_str
     
-    def clean(self):
+    def clean(self, validate_after_clean=True, **kwargs):
         """
-        Apply all queued actions from the Path helper to clean the path.
-        """
-        self._path_helper.apply_actions()  # Clean the path by applying queued actions
-        return self.get_full_path()
+        Clean the path by processing all unseen or pending parts.
 
-    def validate(self):
+        Args:
+            validate_after_clean (bool): If True, validate the path after cleaning.
+        
+        Returns:
+            str: The cleaned path.
         """
-        Validate the path by checking for issues and raising a ValueError if any exist.
+        parts_to_clean = self._path_helper.get_parts_to_clean()
+
+        # override the issues log with a clean slate for the parts we're about to clean. :) 
+        # this helps prevent false positives in the validation step after cleaning. :) 
+        self._path_helper.logs["issues"] = self._path_helper.get_issues(clean_mode=True)
+
+        for part in parts_to_clean:
+            part_index = part["index"]
+
+            # Process each part using the subclass-defined processing methods
+            for process_method in self.processing_methods():
+                cleaned_item = process_method(part, action="clean")
+                self._path_helper.parts[part_index]["part"] = cleaned_item
+
+            # Determine the cleaned status based on pending actions
+            pending_actions = self._path_helper.get_pending_actions_for_part(part_index)
+            status = "pending" if pending_actions else "complete"
+            self._path_helper.mark_part(part_index, state="cleaned_status", status=status)
+
+        cleaned_path = self._path_helper.get_full_path()
+
+        if validate_after_clean:
+            self.validate(**kwargs)
+
+        return cleaned_path
+
+    def validate(self, raise_error=True, **kwargs):
         """
-        issues = self._path_helper.get_logs()["issues"]
-        if issues:
-            # Raise a ValueError with a JSON dump of the issues
-            raise ValueError(
-                "Validation failed with the following issues:\n" + json.dumps(issues, indent=4)
-            )
-        return True  # If no issues, validation passed
+        Validate the path by processing all unseen parts.
+
+        Args:
+            raise_error (bool): If True, raise an error if validation issues are found.
+        
+        Returns:
+            List[dict]: Validation issues or an empty list if none exist.
+        """
+        unseen_parts = self._path_helper.get_parts_to_check()
+
+        for part in unseen_parts:
+            part_index = part["index"]
+
+            # Process each part using the subclass-defined processing methods
+            for process_method in self.processing_methods():
+                process_method(part, action="validate")
+
+            # Determine the checked status based on validation issues
+            issues_for_part = self._path_helper.get_issues_for_part(part_index)
+            status = "invalid" if issues_for_part else "complete"
+            self._path_helper.mark_part(part_index, state="checked_status", status=status)
+
+        issues = self._path_helper.get_logs().get("issues", [])
+        if issues and raise_error:
+            raise ValueError(json.dumps(issues, indent=4))
+
+        return issues
+    
+    def processing_methods(self):
+        """
+        Define the list of processing methods to apply for both cleaning and validation.
+        Subclasses must override this method.
+
+        Returns:
+            List[Callable]: A list of processing methods.
+        """
+        raise NotImplementedError("Subclasses must define `processing_methods`.")
 
     def get_full_path(self) -> str:
         """
