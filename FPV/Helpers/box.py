@@ -8,6 +8,10 @@ class FPV_Box(FPV_Base):
         "outlook.pst", "quickbooks.qbb", "google_docs.gdoc", 
         "google_sheets.gsheet", "google_slides.gslides", "mac_package.pkg"
     }
+    acceptable_root_patterns = [
+        r"^root$",       # Explicit root folder named "root" (internal representation)
+        r"^[^/<>:\"|?*]+$"  # User-facing paths for top-level folders
+    ]
 
     def __init__(self, path: str, **kwargs):
         super().__init__(path, **kwargs)
@@ -22,6 +26,7 @@ class FPV_Box(FPV_Base):
         self.process_restricted_names(action="validate")
         self.process_whitespace(action="validate")
         self.process_empty_parts(action="validate")
+        return super().validate() # omg babe I feel so validated right now \(>.<)/ <3
 
     def clean(self, raise_error=True):
         """Clean and return a Box-compliant path, validating if raise_error is True."""
@@ -29,9 +34,10 @@ class FPV_Box(FPV_Base):
         self.process_restricted_names(action="clean")
         self.process_whitespace(action="clean")
         self.process_empty_parts(action="clean")
-        self.process_trailing_periods(action="clean")  # Assuming trailing periods logic exists
+        self.process_trailing_periods(action="clean")  
 
         if raise_error:
             self.validate()
 
-        return self.get_full_path()
+        # so fresh and so clean clean 
+        return super().clean() # she's a super clean.. super clean, she's super clean yeah! 

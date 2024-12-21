@@ -12,138 +12,130 @@ class FPV_Windows(FPV_Base):
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", 
         "LPT6", "LPT7", "LPT8", "LPT9"
     }
+    acceptable_root_patterns = [r"^[A-Za-z]:\\$", r"^[A-Za-z]:/$"]
 
     def __init__(self, path, **kwargs):
         super().__init__(path, **kwargs)
-        self.init_kwargs = kwargs
-        self.sep = kwargs.get("sep", "\\")
-        if not self.relative:
-            if self.path.startswith(self.sep):
-                self.path = self.path[1:] # this should fix any weird "/C:/" paths due to the base formatting it does :) 
 
-        if self.auto_clean:
-            self.path = self.clean()
-
-    def validate(self, path='', relative=None):
+    def validate(self):
         """Validate the full path for Windows, including Windows-specific validations."""
-        input_path = path if path else self.path
-        check_drive_letter = not self.relative if relative is None else not relative
-        if check_drive_letter:
-            self.validate_drive_letter(path=input_path)
-        
-        self.validate_path_length(path=input_path)
-        self.validate_invalid_characters(path=input_path)
-        self.validate_restricted_names(path=input_path)
-        
-        # Validate each part does not end with a period and has no leading/trailing spaces
-        self.validate_if_part_ends_with_period(path=input_path)
-        self.validate_if_whitespace_around_parts(path=input_path)
+        self.process_path_length(action="validate")
+        self.process_invalid_characters(action="validate")
+        self.process_restricted_names(action="validate")
+        self.process_whitespace(action="validate")
+        self.process_empty_parts(action="validate")
+        self.process_trailing_periods(action="validate")
+        self.process_root_folder_format(self._path_helper.parts[0], action="validate")
+        return super().validate()
 
-        self.validate_empty_parts(path=input_path)
+    def clean(self, raise_error=True):
+        """Clean and return the Windows-compliant path, validating if raise_error is True."""
+        self.process_path_length(action="clean")
+        self.process_invalid_characters(action="clean")
+        self.process_restricted_names(action="clean")
+        self.process_whitespace(action="clean")
+        self.process_empty_parts(action="clean")
+        self.process_trailing_periods(action="clean")
+        self.process_root_folder_format(self._path_helper.parts[0], action="clean")
 
-    def clean(self, path='', raise_error=True):
-        """Clean and return the Windows-compliant path, and validate if raise_error is True."""
-        cleaned_path = path if path else self.path
-        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
-        cleaned_path= self.remove_trailing_periods(cleaned_path)
-        cleaned_path = self.remove_empty_parts(cleaned_path)
-        cleaned_path = f"{self.sep}{cleaned_path}" if self.relative else cleaned_path
-
-        # Validate cleaned path if needed
         if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_Windows(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
+            self.validate()
 
-        return cleaned_path
-
-    def validate_drive_letter(self, path=''):
-        """Verify that the path starts with a valid drive letter (Windows-specific)."""
-        input_path = path if path else self.path
-        input_path_parts = input_path.strip(self.sep).split(self.sep)
-        drive_letter_pattern = re.compile(r"^[A-Za-z]:")
-        if not drive_letter_pattern.match(input_path_parts[0]):
-            raise ValueError(f"Invalid or missing drive letter in the path: '{self.path}'")
+        return super().clean()
 
 
 class FPV_MacOS(FPV_Base):
-    invalid_characters = ''  # No additional invalid characters besides path delimiters
+    # MacOS-specific invalid characters (no additional invalid characters apart from path delimiters)
+    invalid_characters = ""
+
+    # Reserved file/folder names
+    restricted_names = {".DS_Store", "._myfile"}
+
+    # Regex for leading periods in folder names
+    unacceptable_leading_patterns = [r"^\.+[^/.]+$"]  # e.g., ".hidden_folder" is invalid
+
+    acceptable_root_patterns = [r"^/[^/\0]+$"]
 
     def __init__(self, path, **kwargs):
         super().__init__(path, **kwargs)
-        self.restricted_names = {".DS_Store", "._myfile"}  # Common Mac reserved names
-        self.init_kwargs = kwargs
 
-        if self.auto_clean:
-            self.path = self.clean()
+    def process_leading_periods(self, action: str):
+        """
+        Process leading periods in folder names based on the specified action.
+        """
+        for i, part in enumerate(self._path_helper.parts):
+            # Skip the file check (last part) if this is a file
+            if self._path_helper.file_added and i == len(self._path_helper.parts) - 1:
+                continue
+
+            # Check if the folder starts with a leading period
+            if any(re.match(pattern, part) for pattern in self.unacceptable_leading_patterns):
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "type": "issue",
+                            "category": "LEADING_PERIOD",
+                            "details": {"part": part, "index": i},
+                            "reason": f"Folder name '{part}' starts with a leading period, which is not allowed.",
+                        }
+                    )
+                elif action == "clean":
+                    cleaned_part = part.lstrip(".")  # Remove leading periods
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "LEADING_PERIOD",
+                            "subtype": "MODIFY",
+                            "priority": 2,  # Set appropriate priority
+                            "details": {"original": part, "new_value": cleaned_part, "index": i},
+                            "reason": f"Removed leading periods from '{part}'.",
+                        }
+                    )
 
     def validate(self):
         """Validate the path for MacOS-specific restrictions."""
-        self.validate_empty_parts()
-        self.validate_if_whitespace_around_parts()
-        self.validate_restricted_names()
+        self.process_empty_parts(action="validate")
+        self.process_whitespace(action="validate")
+        self.process_restricted_names(action="validate")
+        self.process_leading_periods(action="validate")
+        return super().validate()
 
     def clean(self, raise_error=True):
         """Clean and return the MacOS-compliant path, and validate if raise_error is True."""
-        cleaned_path = super().clean(raise_error=raise_error)
-        cleaned_path = self.get_validate_or_clean_method("restricted_names", "clean", path=cleaned_path)
+        self.process_empty_parts(action="clean")
+        self.process_whitespace(action="clean")
+        self.process_restricted_names(action="clean")
+        self.process_leading_periods(action="clean")
 
         if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_MacOS(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
+            self.validate()
 
-        return cleaned_path
+        return super().clean()
 
 
 class FPV_Linux(FPV_Base):
-    invalid_characters = '\0'  # Only null character is invalid on Linux
+    # Only null character is invalid in Linux paths
+    invalid_characters = '\0'
+
+    acceptable_root_patterns = [r"^/[^/\0]+$"]
 
     def __init__(self, path, **kwargs):
         super().__init__(path, **kwargs)
-        self.init_kwargs = kwargs
-        
-        self.corresponding_validate_and_clean_methods.update(
-            {"null_character": {"validate": "validate_null_character", "clean": "clean_null_character"}}
-        )
-
-        if self.auto_clean:
-            self.path = self.clean()
-
-    def validate_null_character(self):
-        """Check if the path contains a null character."""
-        if '\0' in self.path:
-            raise ValueError('Null character "\\0" is not allowed in Linux file paths.')
-        
-    def clean_null_character(self):
-        """Remove null characters from the path."""
-        return self.path.replace('\0', '')
 
     def validate(self):
         """Validate the path for Linux-specific restrictions."""
-        self.validate_empty_parts()
-        self.validate_if_whitespace_around_parts()
-
-       # validate null character
-        self.validate_null_character()
+        self.process_invalid_characters(action="validate")
+        self.process_empty_parts(action="validate")
+        self.process_whitespace(action="validate")
+        return super().validate()
 
     def clean(self, raise_error=True):
-        """Clean and return the Linux-compliant path, and validate if raise_error is True."""
-        # so fresh and so clean clean (clean) lmao
-        # she is super clean, super clean! 
-        # sorry... I've been working for 12 hours now. :) brain no doin brain stuffs
-        cleaned_path = super().clean(raise_error=raise_error)
-        cleaned_path = cleaned_path.replace('\0', '')
+        """Clean and return a Linux-compliant path, and validate if raise_error is True."""
+        self.process_invalid_characters(action="clean")
+        self.process_empty_parts(action="clean")
+        self.process_whitespace(action="clean")
 
         if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_Linux(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
+            self.validate()
 
-        return cleaned_path
+        return super().clean()

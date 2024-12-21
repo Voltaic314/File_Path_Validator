@@ -25,19 +25,44 @@ class Path:
         """Add a new part to the path."""
         if self.file_added:
             raise ValueError("Cannot add more parts after a file has been added.")
+        
         self.parts.append(part)
         if is_file:
             self.file_added = True
 
+        # Log the addition
+        self.add_action(
+            {
+                "type": "action",
+                "category": "ADD_PART",
+                "subtype": "ADD",
+                "details": {"part": part, "is_file": is_file},
+                "reason": "Added a new part to the path.",
+            },
+            priority=3,
+        )
+
     def remove_part(self, index: int):
-        """Remove a part by its index."""
+        """Remove a part from the path."""
         if 0 <= index < len(self.parts):
             removed_part = self.parts.pop(index)
             if index == len(self.parts) and self.file_added:  # Removed the last part
                 self.file_added = False
-            return removed_part
+
+            # Log the removal
+            self.add_action(
+                {
+                    "type": "action",
+                    "category": "REMOVE_PART",
+                    "subtype": "REMOVE",
+                    "details": {"index": index, "part": removed_part},
+                    "reason": f"Removed part '{removed_part}' at index {index}.",
+                },
+                priority=2,
+            )
         else:
             raise IndexError("Invalid index for path parts.")
+
 
     def set_part(self, index: int, part: str):
         """Replace a part at a specific index."""

@@ -1,94 +1,97 @@
 from FPV.Helpers._base import FPV_Base
 
+
 class FPV_OneDrive(FPV_Base):
-    # Set invalid characters and max path length for OneDrive
+    # OneDrive-specific rules
     invalid_characters = FPV_Base.invalid_characters + "#%&*:{}<>?|\""
-    max_length = 400  # Assume the non-Windows default for OneDrive; can be adjusted if needed
+    max_length = 400
+    restricted_names = {
+        ".lock", "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5",
+        "COM6", "COM7", "COM8", "COM9", "LPT1",
+        "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",
+        "LPT7", "LPT8", "LPT9", "_vti_", "desktop.ini"
+    }
+    restricted_prefix = "~$"
+    restricted_root_level_folder = "forms"
+    acceptable_root_patterns = [r"^/$", r"^/root$"]
 
     def __init__(self, path: str, **kwargs):
         super().__init__(path, **kwargs)
-        self.init_kwargs = kwargs
-
-        self.restricted_names = {
-            ".lock", "CON", "PRN", "AUX", "NUL", 
-            "COM1", "COM2", "COM3", "COM4", "COM5", 
-            "COM6", "COM7", "COM8", "COM9", "LPT1", 
-            "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
-            "LPT7", "LPT8", "LPT9", "_vti_", "desktop.ini"
-        }
-        self.restricted_prefix = "~$"
-        self.restricted_root_level_folder = "forms"
-
-        # Adding custom corresponding methods to our clean/validate helpers in the base class
-        self.corresponding_validate_and_clean_methods.update(
-            {"restricted_prefix": {"validate": "validate_restricted_prefix", "clean": "remove_restricted_prefix"},
-            "restricted_root_folder": {"validate": "validate_restricted_root_folder", "clean": "remove_restricted_root_folder"}}
-        )
-
-        if self.auto_clean:
-            self.path = self.clean()
 
     def validate(self):
-        """Validate the full path for OneDrive, including OneDrive-specific validations."""
-        self.validate_path_length()
-        self.validate_invalid_characters()
-        self.validate_restricted_names()
-        self.validate_if_part_ends_with_period()
-        self.validate_if_whitespace_around_parts()
+        """Validate the path for OneDrive-specific rules."""
+        self.process_path_length(action="validate")
+        self.process_invalid_characters(action="validate")
+        self.process_restricted_names(action="validate")
+        self.process_whitespace(action="validate")
+        self.process_empty_parts(action="validate")
+        self.process_restricted_prefix(action="validate")
+        self.process_restricted_root(action="validate")
 
-        # Apply OneDrive-specific checks on each path part
-        for part in self.path_parts:
-            self.validate_restricted_prefix(part)
-            self.validate_restricted_root_folder(part)
-
-        self.validate_empty_parts()
+        return super().validate()
 
     def clean(self, raise_error=True):
-        """Clean the path to be OneDrive-compliant and validate if `raise_error` is True."""
-        cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
+        """Clean and return a OneDrive-compliant path."""
+        self.process_path_length(action="clean")
+        self.process_invalid_characters(action="clean")
+        self.process_restricted_names(action="clean")
+        self.process_whitespace(action="clean")
+        self.process_empty_parts(action="clean")
+        self.process_restricted_prefix(action="clean")
+        self.process_restricted_root(action="clean")
 
-        # Clean up prefixes and handle restricted root folder
-        cleaned_path_parts = []
-        path_parts = cleaned_path.split(self.sep)
-        for index, part in enumerate(path_parts):
-            part = self.remove_restricted_prefix(part)
-            if index == 0:
-                part = self.remove_restricted_root_folder(part)
-            part = part.strip().rstrip(".")
-            if part:
-                cleaned_path_parts.append(part)
-        
-        cleaned_path = self.sep.join(cleaned_path_parts).strip(self.sep)
-        cleaned_path = f"{self.sep}{cleaned_path}" if not cleaned_path.startswith(self.sep) else cleaned_path
-
-        # Revalidate if needed
         if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_OneDrive(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
+            self.validate()
 
-        return cleaned_path
+        return super().clean()
 
-    # OneDrive-specific helper methods
-    def validate_restricted_prefix(self, part):
-        """Validate that a part of the path does not start with the restricted prefix."""
-        if part.startswith(self.restricted_prefix):
-            raise ValueError(f'Restricted prefix "{self.restricted_prefix}" found in path part: "{part}"')
+    def process_restricted_prefix(self, action: str):
+        """Process path parts with restricted prefixes."""
+        for i, part in enumerate(self._path_helper.parts):
+            if part.startswith(self.restricted_prefix):
+                if action == "validate":
+                    self._path_helper.add_issue(
+                        {
+                            "category": "RESTRICTED_PREFIX",
+                            "subtype": "REPORT",
+                            "details": {"part": part, "index": i},
+                            "reason": f'Restricted prefix "{self.restricted_prefix}" found in path part.',
+                        }
+                    )
+                elif action == "clean":
+                    cleaned_part = part[len(self.restricted_prefix):]
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "RESTRICTED_PREFIX",
+                            "subtype": "MODIFY",
+                            "priority": 2,
+                            "details": {"original": part, "new_value": cleaned_part, "index": i},
+                            "reason": f'Removed restricted prefix "{self.restricted_prefix}" from path part.',
+                        }
+                    )
 
-    def validate_restricted_root_folder(self, part):
-        """Validate that the first part of the path is not the restricted root folder."""
-        if part.lower() == self.restricted_root_level_folder and self.path_parts.index(part) == 0:
-            raise ValueError(f'Restricted root folder "{self.restricted_root_level_folder}" found at path root: "{part}"')
-
-    def remove_restricted_prefix(self, part):
-        """Remove the restricted prefix from a path part if present."""
-        return part[len(self.restricted_prefix):] if part.startswith(self.restricted_prefix) else part
-
-    def remove_restricted_root_folder(self, part):
-        """Remove the restricted root folder name if it is the first part of the path."""
-        return "" if part.lower() == self.restricted_root_level_folder else part
+    def process_restricted_root(self, action: str):
+        """Process restricted root folder names."""
+        if self._path_helper.parts and self._path_helper.parts[0].lower() == self.restricted_root_level_folder:
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "category": "RESTRICTED_ROOT",
+                        "subtype": "REPORT",
+                        "details": {"part": self._path_helper.parts[0], "index": 0},
+                        "reason": f'Restricted root folder "{self.restricted_root_level_folder}" found at path root.',
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "RESTRICTED_ROOT",
+                        "subtype": "REMOVE",
+                        "priority": 1,
+                        "details": {"part": self._path_helper.parts[0], "index": 0},
+                        "reason": f'Removed restricted root folder "{self.restricted_root_level_folder}" from path.',
+                    }
+                )

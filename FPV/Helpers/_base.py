@@ -1,5 +1,6 @@
+import re
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict
 from ._path import Path
 
 class FPV_Base:
@@ -9,13 +10,18 @@ class FPV_Base:
     invalid_characters = ""
     max_length = 0
     restricted_names: set = set()
+    acceptable_root_patterns: List[str] = []
 
-    def __init__(self, path: str, sep: str = '/', auto_clean: bool = False, auto_validate: bool = True):
-        self._path_helper = Path(initial_path=path, sep=sep)
+    def __init__(self, path: str, sep: str = '/', auto_clean: bool = False, auto_validate: bool = True, relative: bool = True):
+        self._path_helper = Path(initial_path=path, sep=sep, relative=relative)
+        self.auto_clean = auto_clean
+        self.auto_validate = auto_validate
+        self.sep = sep
+        self.path = self._path_helper.get_full_path()
 
-        if auto_clean:
+        if self.auto_clean:
             self.clean()
-        if auto_validate:
+        if self.auto_validate:
             self.validate()
 
     def get_logs(self) -> Dict[str, List[dict]]:
@@ -23,20 +29,30 @@ class FPV_Base:
         return self._path_helper.get_logs()
     
     def add_part(self, part: str, is_file: bool = False, mode: str = "validate"):
-        """Add a new part to the path and process it."""
+        """Add a new part to the path, process it, and check overall validity."""
         self._path_helper.add_part(part, is_file=is_file)
+
+        # Process the specific part (validate or clean based on mode)
         if mode.lower() == "validate":
             self.validate()  # Revalidate the path after addition
         elif mode.lower() == "clean":
             self.clean()
 
+        # Always check path length after every modification
+        self.process_path_length(action="validate" if mode == "validate" else "clean")
+
     def remove_part(self, index: int, mode: str = "validate"):
-        """Remove a part from the path and revalidate."""
+        """Remove a part from the path, process remaining, and check validity."""
         self._path_helper.remove_part(index)
+
+        # Validate or clean the remaining path
         if mode.lower() == "validate":
             self.validate()  # Revalidate the path after removal
         elif mode.lower() == "clean":
             self.clean()
+
+        # Always check path length after modification
+        self.process_path_length(action="validate" if mode == "validate" else "clean")
 
     def process_invalid_characters(self, action: str):
         """Process invalid characters based on the specified action."""
@@ -72,49 +88,70 @@ class FPV_Base:
                     )
 
     def process_root_folder_format(self, root: str, action: str):
-        """
-        Placeholder for subclasses to process the root folder format.
-        Subclasses should implement this method to handle absolute paths' root part.
-        """
-        raise NotImplementedError("Subclasses must implement the 'process_root_folder_format' method.")
+        """Process the root folder format based on acceptable patterns."""
+        if not self.acceptable_root_patterns:
+            raise NotImplementedError(
+                "Subclasses must define acceptable_root_patterns to validate root formats."
+            )
 
-    def process_path_length(self, action: str):
-        """Process path length based on the specified action."""
-        full_path = self._path_helper.get_full_path()
-        current_length = len(full_path)
+        valid = any(re.match(pattern, root) for pattern in self.acceptable_root_patterns)
 
-        if current_length > self.max_length:
-            priority = 1  # Higher priority for path length operations
+        if not valid:
             if action == "validate":
                 self._path_helper.add_issue(
                     {
                         "type": "issue",
-                        "category": "PATH_LENGTH",
-                        "details": {"current_length": current_length, "max_length": self.max_length},
-                        "reason": f"Path exceeds maximum length of {self.max_length} characters.",
+                        "category": "ROOT_FORMAT",
+                        "details": {"root": root},
+                        "reason": f"Root '{root}' does not match any acceptable pattern: {self.acceptable_root_patterns}.",
                     }
                 )
             elif action == "clean":
-                cumulative_length = 0
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "ROOT_FORMAT",
+                        "subtype": "REMOVE",
+                        "priority": 0,
+                        "details": {"part": root},
+                        "reason": "Removed invalid root folder.",
+                    }
+                )
 
-                for i, part in enumerate(self._path_helper.parts):
-                    part_length = len(part)
-                    separator_length = 1 if i > 0 else 0  # Account for separator between parts
+    def process_path_length(self, action: str):
+        """Process path length based on the specified action."""
+        if not self._path_helper.check_path_length(self.max_length):
+            return  # Skip if within the limit
 
-                    # If adding this part exceeds max length, mark it for removal
-                    if cumulative_length + part_length + separator_length > self.max_length:
-                        self._path_helper.add_action(
-                            {
-                                "type": "action",
-                                "category": "PATH_LENGTH",
-                                "subtype": "REMOVE",
-                                "details": {"part": part, "index": i},
-                                "reason": f"Marked part '{part}' for removal due to exceeding path length limit.",
-                            },
-                            priority=priority
-                        )
-                    else:
-                        cumulative_length += part_length + separator_length
+        if action == "validate":
+            self._path_helper.add_issue(
+                {
+                    "type": "issue",
+                    "category": "PATH_LENGTH",
+                    "details": {"current_length": self._path_helper.path_length, "max_length": self.max_length},
+                    "reason": f"Path exceeds maximum length of {self.max_length} characters.",
+                }
+            )
+        elif action == "clean":
+            cumulative_length = 0
+
+            for i, part in enumerate(self._path_helper.parts):
+                part_length = len(part)
+                separator_length = 1 if i > 0 else 0
+
+                if cumulative_length + part_length + separator_length > self.max_length:
+                    self._path_helper.add_action(
+                        {
+                            "type": "action",
+                            "category": "PATH_LENGTH",
+                            "subtype": "REMOVE",
+                            "details": {"part": part, "index": i},
+                            "reason": f"Marked part '{part}' for removal due to exceeding path length limit.",
+                        },
+                        priority=1
+                    )
+                else:
+                    cumulative_length += part_length + separator_length
 
     def process_restricted_names(self, action: str):
         """Process restricted names based on the specified action."""
@@ -220,6 +257,7 @@ class FPV_Base:
                 if action == "validate":
                     self._path_helper.add_issue(
                         {
+                            "type": "issue",
                             "category": "EMPTY_PART",
                             "subtype": "REMOVE",
                             "details": {"index": i},
@@ -237,7 +275,6 @@ class FPV_Base:
                             "reason": f"Removed empty part at index {i} from the path.",
                         }
                     )
-
     
     def clean(self):
         """
@@ -251,10 +288,6 @@ class FPV_Base:
         Validate the path by checking for issues and raising a ValueError if any exist.
         """
         issues = self._path_helper.get_logs()["issues"]
-        path_length_issues = [issue for issue in issues if issue["category"] == "PATH_LENGTH"]
-        if not path_length_issues:
-            # check it once more
-            self.process_path_length("validate")
         if issues:
             # Raise a ValueError with a JSON dump of the issues
             raise ValueError(
