@@ -19,15 +19,26 @@ class FPV_Windows(FPV_Base):
 
     def processing_methods(self):
         """Define the processing methods for Windows paths."""
-        return [
-            lambda part, action: self.process_root_folder_format(part, action),
-            lambda part, action: self.process_invalid_characters(part, action),
-            lambda part, action: self.process_restricted_names(part, action),
-            lambda part, action: self.process_whitespace(part, action),
-            lambda part, action: self.process_empty_parts(part, action),
-            lambda part, action: self.process_trailing_periods(part, action),
-            lambda part, action: self.process_path_length(part, action),
-        ]
+        return {
+            "root": [
+                lambda part, action: self.process_root_folder_format(part, action)
+            ],
+            "folder": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_trailing_periods(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+            "file": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_trailing_periods(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+        }
 
 
 class FPV_MacOS(FPV_Base):

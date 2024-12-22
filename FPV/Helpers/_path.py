@@ -38,7 +38,7 @@ class Path:
         if not clean_mode:
             self.logs["issues"]
         else:
-            return [issue for issue in self.logs["issues"] if issue.get("details", {}).get("index") in [part["index"] for part in self.get_parts_to_clean()]]
+            return [issue for issue in self.logs["issues"] if issue.get("details", {}).get("index") not in [part["index"] for part in self.get_parts_to_clean()]]
 
     def get_pending_actions_for_part(self, index: int) -> list:
         """Retrieve all pending actions for parts."""
@@ -58,6 +58,23 @@ class Path:
             if entry["part"] == part:
                 return entry["index"]
         raise ValueError(f"Part '{part}' not found in the path.")
+    
+    def get_part_type(self, part: dict) -> str:
+        """Retrieve the type of a part based on its index."""
+        index = part["index"]
+        # there are 3 possible returns. "file", "folder", "root"
+        # root can only happen if the index is 0 and self.relative == False
+        if index == 0 and not self.relative:
+            return "root"
+        
+        # file can only happen if the index is the last part and a file has been added
+        # though we can't necessarily ASSUME the last item is a file, 
+        # we can assume that if a file has been added, it is the last item.
+        if index == len(self.parts) - 1 and self.file_added_to_parts:
+            return "file"
+        
+        # else, it's a folder
+        return "folder"
 
     def add_part(self, part: str, is_file: bool = False):
         """Add a new part to the path."""
@@ -80,6 +97,9 @@ class Path:
             if index == len(self.parts) and self.file_added:
                 self.file_added = False
             self.path_length -= len(removed_part["part"]) + len(self.sep)
+            # remove any related issues involving that part
+            self.logs["issues"] = [issue for issue in self.logs["issues"] if issue.get("details", {}).get("index") != index]
+        
         else:
             raise IndexError("Invalid index for path parts.")
 

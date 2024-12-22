@@ -12,14 +12,20 @@ class FPV_Base:
     restricted_names: set = set()
     acceptable_root_patterns: List[str] = []
 
-    def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, relative: bool = True, file_added: bool = False):
+    def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, auto_clean: bool = False, relative: bool = True, file_added: bool = False):
         self._path_helper = Path(initial_path=path, sep=sep, relative=relative, file_added=file_added)
         self.auto_validate = auto_validate
+        self.auto_clean = auto_clean
         self.sep = sep
         self.file_added = file_added
         self.path = self._path_helper.get_full_path()
 
-        if self.auto_validate:
+        # clean before validating
+        if self.auto_clean:
+            self.clean()
+
+        # this is an elif because clean already validates the path upon cleaning
+        elif self.auto_validate:
             self.validate()
 
     def get_logs(self) -> Dict[str, List[dict]]:
@@ -31,10 +37,10 @@ class FPV_Base:
         self._path_helper.add_part(part, is_file=is_file)
 
         # Process the specific part (validate or clean based on mode)
-        if mode.lower() == "validate":
+        if mode.lower() == "clean" or self.auto_clean:
+            self.clean()  # Clean the path after addition
+        if mode.lower() == "validate" or self.auto_validate:
             self.validate()  # Revalidate the path after addition
-        elif mode.lower() == "clean":
-            self.clean()
 
         # Always check path length after every modification
         self.process_path_length(action="validate" if mode == "validate" else "clean")
@@ -42,12 +48,12 @@ class FPV_Base:
     def remove_part(self, index: int, mode: str = "validate"):
         """Remove a part from the path, process remaining, and check validity."""
         self._path_helper.remove_part(index)
-
-        # Validate or clean the remaining path
-        if mode.lower() == "validate":
-            self.validate()  # Revalidate the path after removal
-        elif mode.lower() == "clean":
-            self.clean()
+        
+        # Process the specific part (validate or clean based on mode)
+        if mode.lower() == "clean" or self.auto_clean:
+            self.clean()  # Clean the path after addition
+        if mode.lower() == "validate" or self.auto_validate:
+            self.validate()  # Revalidate the path after addition
 
         # Always check path length after modification
         self.process_path_length(action="validate" if mode == "validate" else "clean")
@@ -229,7 +235,7 @@ class FPV_Base:
             name, ext = '.'.join(cleaned_part.split('.')[:-1]).strip(), cleaned_part.split('.')[-1].strip()
             cleaned_part = f"{name}.{ext}"
 
-        if part != cleaned_part:
+        if part_str != cleaned_part:
             if action == "validate":
                 self._path_helper.add_issue(
                     {
@@ -294,15 +300,18 @@ class FPV_Base:
         """
         parts_to_clean = self._path_helper.get_parts_to_clean()
 
-        # override the issues log with a clean slate for the parts we're about to clean. :) 
-        # this helps prevent false positives in the validation step after cleaning. :) 
+        # Override the issues log with a clean slate for the parts we're about to clean.
         self._path_helper.logs["issues"] = self._path_helper.get_issues(clean_mode=True)
 
         for part in parts_to_clean:
             part_index = part["index"]
+            part_type = self._path_helper.get_part_type(part)
 
-            # Process each part using the subclass-defined processing methods
-            for process_method in self.processing_methods():
+            # Get the appropriate processing methods based on the part type
+            processing_methods = self.processing_methods().get(part_type, [])
+
+            # Process the part with each method
+            for process_method in processing_methods:
                 cleaned_item = process_method(part, action="clean")
                 self._path_helper.parts[part_index]["part"] = cleaned_item
 
@@ -310,6 +319,8 @@ class FPV_Base:
             pending_actions = self._path_helper.get_pending_actions_for_part(part_index)
             status = "pending" if pending_actions else "complete"
             self._path_helper.mark_part(part_index, state="cleaned_status", status=status)
+            self._path_helper.mark_part(part_index, state="checked_status", status="unseen") if validate_after_clean else None
+            # mark it as unseen so that validate checks it again if validate_after_clean is True
 
         cleaned_path = self._path_helper.get_full_path()
 
@@ -332,9 +343,13 @@ class FPV_Base:
 
         for part in unseen_parts:
             part_index = part["index"]
+            part_type = self._path_helper.get_part_type(part)
 
-            # Process each part using the subclass-defined processing methods
-            for process_method in self.processing_methods():
+            # Get the appropriate processing methods based on the part type
+            processing_methods = self.processing_methods().get(part_type, [])
+
+            # Process the part with each method
+            for process_method in processing_methods:
                 process_method(part, action="validate")
 
             # Determine the checked status based on validation issues
@@ -348,7 +363,7 @@ class FPV_Base:
 
         return issues
     
-    def processing_methods(self):
+    def processing_methods(self) -> dict:
         """
         Define the list of processing methods to apply for both cleaning and validation.
         Subclasses must override this method.
