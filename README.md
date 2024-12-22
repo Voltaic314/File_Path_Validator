@@ -1,21 +1,29 @@
-
 # 🎉 File Path Validator (FPV) Library Documentation
 
 ## Overview
-The **File Path Validator (FPV)** library validates and cleans file paths to ensure they meet platform-specific naming restrictions and length limits. It’s compatible with multiple operating systems and cloud storage providers, providing automated path validation across various services. Many cloud storage providers try to make sure that their platform is compliant with operating system specific rules as well. So one could also use this library to ensure paths are cross-platform compliant ahead of time too if the storage provider is not doing this. For example, Google Drive does not have many restrictions, but in order to sync with windows they need to ensure paths meet windows'path rules. So this library can be used to help with that task.
+The **File Path Validator (FPV)** library is a robust solution for validating and cleaning file paths to ensure compliance with platform-specific naming restrictions and length limits. FPV supports both operating systems and cloud storage providers, enabling seamless path validation across diverse environments. 
 
+Many cloud storage providers strive to enforce compliance with OS-specific rules, but not all do so reliably. For instance, Google Drive syncs with Windows, requiring paths to meet Windows-specific rules, yet lacks strict enforcement on its end. FPV can bridge this gap, offering cross-platform path validation ahead of time to avoid runtime failures.
 
-## Why even do this at all?
-(From Logan - The creator of this library): "Often times at my company we have to generate file paths for clients using various disjointed sources of information and bits of data. This can lead to messy file path strings. We do what we can to clean it up, but this library gives us reassurance that our files are being flagged with more helpful error messages before it gets to the point of failing at the storage provider / OS. -- It's also worth noting if you want to be lazy and have this library attempt to clean your paths for you, it can do that as well using the clean method of the given class you are using. I hope you will find this library as helpful and useful as I do."
+---
+
+## Why Choose FPV?
+> (From Logan - Creator of FPV):  
+> "At my company, we often generate file paths for clients from a mix of disjointed data sources. This can result in messy file path strings that may fail at the storage provider or OS level. FPV ensures our paths are flagged with actionable error messages early on.  
+> 
+> For those who prefer automation, FPV’s cleaning functionality can attempt to fix paths proactively. Whether you're debugging paths manually or streamlining cleanup, FPV has been a game-changer for us. I hope you find it equally helpful!"
+
+---
 
 ## 🚀 Installation
-To install the FPV library, run the following:
+Install the FPV library via pip:
 ```bash
 pip install file-path-validator
 ```
 
+---
+
 ## Supported Platforms & Providers 🌐
-FPV provides support for the following:
 
 ### 🖥️ Operating Systems
 - **Windows**
@@ -30,59 +38,119 @@ FPV provides support for the following:
 - **SharePoint**
 - **ShareFile**
 
-Each class inherits from `FPV_Base` and introduces platform-specific restrictions. Subclasses define their unique validation and cleaning rules while leveraging the base class’s core validation and cleaning functionality.
+Each class inherits from `FPV_Base`, defining unique validation and cleaning rules tailored to the platform or provider while leveraging the library’s core functionality.
 
-## Usage Example 🛠️
-The following example demonstrates basic usage with `FPV_Windows`:
+---
+
+## 🛠️ Key Features and Usage Examples
+
+### Core Arguments
+FPV provides several configuration options for fine-grained control:
+
+- **`auto_clean`**: Attempts to clean paths before validation. If issues remain unresolved after cleaning, an error is raised. Defaults to `False`.
+- **`auto_validate`**: Automatically validates the path or parts upon modification. Defaults to `True`.
+- **`relative`**: Determines if the path is treated as relative (`True`) or absolute (`False`). Some service classes enforce a specific behavior (e.g., macOS paths are always relative).
+- **`file_added`**: Explicitly specify if the path includes a file. The library avoids assumptions about the last path part, requiring this flag for clarity.
+- **`sep`**: Specifies the path separator (e.g., `"/"` for POSIX, `"\\"` for Windows). Service classes provide defaults but allow overrides.
+
+---
+
+### Dynamic Path Building Example
 
 ```python
 from FPV import FPV_Windows
 
-def main():
-    example_path = "C:/ Broken/ **path/to/||file . txt"
-    
-    # Create a validator object
-    FPVW = FPV_Windows(example_path, relative=True)
+def dynamic_path_demo():
+    # Instantiate the validator
+    validator = FPV_Windows("C:\\", relative=False)
 
-    # Access the original path
-    print("Original Path:", FPVW.original_path)
+    # Add parts dynamically
+    validator.add_part("NewFolder")
+    validator.add_part("AnotherFolder")
+    validator.add_part("file.txt", is_file=True)
 
-    # Get a cleaned version of your path
-    cleaned_path = FPVW.clean()
-    print("Cleaned Path:", cleaned_path)  # Output should be "C:/Broken/path/to/file.txt"
-
-    # Check if the original path is valid
+    # Validate the dynamic path
     try:
-        FPVW.validate()
-        print("Path is valid!")
+        validator.validate()
+        print("Path is valid:", validator.get_full_path())
     except ValueError as e:
-        print(f"Validation Error: {e}")
+        print("Validation Error:", e)
 
-    # Auto-clean the path upon creating the validator object
-    validator_auto_clean = FPV_Windows(example_path, relative=True)
-    print("Automatically Cleaned Path:", validator_auto_clean.path)
+    # Review issues and actions
+    print("Issues Log:", validator.get_logs()["issues"])
+    print("Actions Log:", validator.get_logs()["actions"])
 
-    ## instantiate more objects... As many as you need to see the validation for each. :)
-
-if __name__ == "__main__":
-    main()
+dynamic_path_demo()
 ```
 
-## ⚙️ Key Methods
-- **`validate()`**: Runs all validation checks for the platform or service, raising `ValueError` if issues are found.
-- **`clean(raise_error=True)`**: Cleans the path to be compliant with the platform’s rules. If `raise_error=True`, it raises an exception for any uncleanable issues. (This is also the default behavior).
+---
 
-## Current limitations
-- This library does not currently support sharepoint site urls or url encoding for paths.
-- Currenly only Windows absolute path validation is supported via drive letter validation.
-- This library currently does not support windows network drive path validation. (well technically it does, but just not the root (first part) of the network drive path. But if you do a str.split("\\")[1:] and pass that string into the windows validator, you should still be able to validate your path).
+### Logs and Action Handling
+- **Issues Log**: Tracks path non-compliance (e.g., invalid characters, excessive length). Use `get_logs()["issues"]` or methods like `get_issues_for_part(index)` for targeted inspection.
+- **Actions Log**: Suggests fixes (e.g., truncations, character removals). Use `get_logs()["actions"]` or `get_pending_actions_for_part(index)` for a step-by-step cleaning recipe.
+
+Example:
+```python
+issues = validator.get_logs()["issues"]
+actions = validator.get_logs()["actions"]
+
+# Apply actions manually if needed
+for action in actions:
+    print(f"Action: {action['reason']} - Details: {action['details']}")
+```
+
+---
+
+### Basic Example
+```python
+from FPV import FPV_Windows
+
+example_path = "C:/ Broken/ **path/to/||file . txt"
+validator = FPV_Windows(example_path, relative=True, sep='/')
+
+try:
+    # Validate the path
+    validator.validate()
+    print("Path is valid!")
+except ValueError as e:
+    print("Validation Error:", e)
+
+# Clean the path
+cleaned_path = validator.clean()
+print("Cleaned Path:", cleaned_path)
+```
+
+---
+
+### Recommendations for Error Handling
+Wrap cleaning and validation calls in a `try-except` block to gracefully handle exceptions:
+```python
+try:
+    cleaned_path = validator.clean()
+    print("Cleaned Path:", cleaned_path)
+except ValueError as e:
+    print("Cleaning Error:", e)
+```
+
+---
+
+## ⚙️ Key Methods
+- **`validate()`**: Validates the entire path. Raises `ValueError` if issues are found unless `raise_error=False` is explicitly set.
+- **`clean()`**: Cleans the path to meet compliance rules, applying fixes from the action log. Raises errors for unresolved issues if `raise_error=True`.
+
+---
+
+## Limitations and Future Plans
+- **Missing Features**: SharePoint site URLs and encoded paths are not yet supported.
+- **Network Drives**: Windows network drive root validation is not supported (though non-root parts are fully validated).
+- **User-Defined Order**: Cleaning/validation order cannot yet be customized but can be manually controlled.
+
+---
 
 ## 🤝 Contributing Guidelines
-Contributions are welcome! Please follow these guidelines:
-
-- **Add Tests**: Ensure new features or bug fixes come with corresponding tests.
-- **Run All Tests**: Before submitting a pull request, confirm that all tests (existing and new) pass.
-- **Code Formatting**: Format code to PEP-8 standards or, at minimum, run a linter before submission.
-- **PR Description**: Briefly explain your contribution's purpose and details on how it improves, fixes, or adds to the library.
+We welcome contributions! Please adhere to the following:
+- **Testing**: Include unit tests for all new features or bug fixes.
+- **Standards**: Ensure code follows PEP-8 standards or run a linter before submission.
+- **Pull Requests**: Clearly describe your changes and their purpose.
 
 Thank you for helping improve FPV! 🎉

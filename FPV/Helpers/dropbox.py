@@ -23,6 +23,16 @@ class FPV_Dropbox(FPV_Base):
         else:
             super().__init__(path, **kwargs)
 
+    # this is to get around weird quirks where 
+    # dropbos will yell at you for having a "." in a file name which 
+    # doesn't make any sense lol.
+    def process_invalid_characters(self, part, action):
+        if part.get("is_file", False):
+            self.invalid_characters = self.invalid_characters.replace(".", "")
+        cleaned_part = super().process_invalid_characters(part, action) # if action is clean that is
+        self.invalid_characters = '<>:"|?*.'  # Reset invalid characters
+        return cleaned_part
+
     def processing_methods(self):
         """Define the processing methods for Dropbox paths."""
         return {
