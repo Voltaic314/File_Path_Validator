@@ -2,6 +2,7 @@ class Path:
     """Manages path state and provides stack-like operations."""
 
     def __init__(self, initial_path: str, sep: str = "/", relative: bool = True, file_added: bool = False):
+        initial_path = initial_path.strip(sep)
         self.parts = []
         self.sep = sep
         self.relative = relative
@@ -123,10 +124,12 @@ class Path:
             if field not in action:
                 raise ValueError(f"Missing required field '{field}' in action log.")
 
-        action["priority"] = priority
-        self.actions_queue.append(action)
-        self.actions_queue.sort(key=lambda x: x["priority"])
-        self.logs["actions"].append(action)
+        # Avoid duplicate actions
+        if action not in self.actions_queue:
+            action["priority"] = priority
+            self.actions_queue.append(action)
+            self.actions_queue.sort(key=lambda x: x["priority"])
+            self.logs["actions"].append(action)
 
     def apply_actions(self):
         """Apply all actions in the queue, sorted by priority."""
@@ -162,10 +165,47 @@ class Path:
         for field in required_fields:
             if field not in issue:
                 raise ValueError(f"Missing required field '{field}' in issue log.")
-        issue_index = issue["details"].get("index")
-        if issue_index is not None:
-            self.parts[issue_index]["checked_status"] = "issue"
-        self.logs["issues"].append(issue)
+
+        # Avoid duplicate issues
+        if issue not in self.logs["issues"]:
+            issue_index = issue["details"].get("index")
+            if issue_index is not None:
+                self.parts[issue_index]["checked_status"] = "issue"
+            self.logs["issues"].append(issue)
+
+    def find_all_parts_with_specific_issues(self, issue_type: str) -> list:
+        """Find all parts with a specific issue type."""
+        parts = []
+        for issue in self.logs["issues"]:
+            if issue.get("category") == issue_type:
+                index = issue.get("details", {}).get("index")
+                if index is not None:
+                    parts.append(self.parts[index])
+        return parts
+
+    
+    def remove_issue(self, index: int, issue_type: str):
+        """Remove an issue from the logs."""
+        if 0 <= index < len(self.parts):
+            # only mark it as unseen if that part has no other issues
+            if not any(issue.get("details", {}).get("index") == index for issue in self.logs["issues"]):
+                self.parts[index]["checked_status"] = "unseen"
+            self.logs["issues"] = [i for i in self.logs["issues"] if i.get("category", "") != issue_type]
+        else:
+            raise IndexError("Invalid index for path parts.")
+        
+    def remove_all_issues(self, issue_type: str = ''):
+        """Remove all issues from the logs."""
+        # if not issue then remove all issues completely
+        if not issue_type:
+            for i, part in enumerate(self.parts):
+                part["checked_status"] = "unseen"
+            self.logs["issues"] = []
+        else:
+            all_parts_with_that_issue = self.find_all_parts_with_specific_issues(issue_type)
+            for part in all_parts_with_that_issue:
+                index = part.get("index")
+                self.remove_issue(index, issue_type)
 
     def get_logs(self) -> dict:
         """Retrieve all logs."""

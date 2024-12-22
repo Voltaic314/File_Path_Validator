@@ -13,7 +13,7 @@ class FPV_Base:
     acceptable_root_patterns: List[str] = []
 
     def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, auto_clean: bool = False, relative: bool = True, file_added: bool = False):
-        self._path_helper = Path(initial_path=path, sep=sep, relative=relative, file_added=file_added)
+        self._path_helper = Path(initial_path=path.strip(sep), sep=sep, relative=relative, file_added=file_added)
         self.auto_validate = auto_validate
         self.auto_clean = auto_clean
         self.sep = sep
@@ -43,7 +43,7 @@ class FPV_Base:
             self.validate()  # Revalidate the path after addition
 
         # Always check path length after every modification
-        self.process_path_length(action="validate" if mode == "validate" else "clean")
+        self.process_path_length(self._path_helper.parts[-1], action="validate" if mode == "validate" else "clean")
 
     def remove_part(self, index: int, mode: str = "validate"):
         """Remove a part from the path, process remaining, and check validity."""
@@ -54,9 +54,8 @@ class FPV_Base:
             self.clean()  # Clean the path after addition
         if mode.lower() == "validate" or self.auto_validate:
             self.validate()  # Revalidate the path after addition
-
-        # Always check path length after modification
-        self.process_path_length(action="validate" if mode == "validate" else "clean")
+        
+        self.process_path_length(part={}, action="validate" if mode == "validate" else "clean")
 
     def process_invalid_characters(self, part: dict, action: str):
         """Process invalid characters for a specific part based on the specified action."""
@@ -96,7 +95,7 @@ class FPV_Base:
         if self._path_helper.relative or index != 0:
             return part_str
 
-        valid = any(re.match(pattern, part_str) for pattern in self.acceptable_root_patterns)
+        valid = any(re.match(pattern, part_str) for pattern in self.acceptable_root_patterns) if self.acceptable_root_patterns else True
 
         if not valid:
             if action == "validate":
@@ -124,7 +123,16 @@ class FPV_Base:
 
     def process_path_length(self, part: dict, action: str):
         """Process part or overall path length based on the specified action."""
-        part_str = part["part"]
+        part_str = part.get("part", "")
+        if not part: 
+            # check to see if current path length is within the max length
+            # if it is and no part was passed, then we are probably in removal mode. 
+            # if so, we should check the path length after the part is removed.
+            # if we are good now, then we can remove all issues related to path length.
+            if self._path_helper.path_length <= self.max_length:
+                self._path_helper.remove_all_issues(issue_type="PATH_LENGTH")
+            return part_str
+
         index = part["index"]
         current_length = self._path_helper.path_length
         part_length = len(part_str)

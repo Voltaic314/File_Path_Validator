@@ -1,98 +1,146 @@
 import pytest
 from FPV.Helpers._base import FPV_Base
+from FPV.Helpers._path import Path
 
 
-class TestFPV_Base:
-    
-    def setup_method(self):
-        # Setup mock values for `BaseService` attributes
-        self.service = FPV_Base("mock/path/to/file.txt", sep='/')
-        self.service.max_length = 20
-        self.service.invalid_characters = '<>:'
-        self.service.restricted_names = {'restricted', 'invalid'}
-        
-    def test_valid_path(self):
-        assert self.service.clean_and_validate_path("path_length", path=self.service.path) == "/mock/path/file.txt"
+# Mock subclass for FPV_Base
+class MockFPV(FPV_Base):
+    """Mock subclass of FPV_Base to test abstract behavior."""
+    max_length = 20
 
-    def test_validate_path_length(self):
-        # Exceeding `max_length` path should raise a ValueError
-        service = FPV_Base("mock/path/with/very/long/filename.txt", sep='/')
-        service.max_length = 20
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_path_length()
-        assert "The specified path is too long" in str(excinfo.value)
+    def __init__(self, path: str, **kwargs):
+        super().__init__(path, **kwargs)
 
-    def test_truncate_path(self):
-        # Test `truncate_path` method with a set `max_length`
-        service = FPV_Base("mock/path/to/filename.txt", sep='/')
-        service.max_length = 20
-        truncated_path = service.truncate_path(service.path)
-        assert len(truncated_path) <= 20
+    def processing_methods(self):
+        """Mock processing methods for the mock class."""
+        return {
+            "root": [lambda part, action: self.mock_process_method(part, action)],
+            "folder": [lambda part, action: self.mock_process_method(part, action)],
+            "file": [lambda part, action: self.mock_process_method(part, action)],
+        }
 
-    def test_validate_invalid_characters(self):
-        # Path with invalid characters should raise a ValueError
-        service = FPV_Base("invalid/path<>/file.txt", sep='/')
-        service.invalid_characters = '<>:'
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_invalid_characters()
-        assert "Invalid character" in str(excinfo.value)
+    def mock_process_method(self, part, action):
+        """Mock processing method."""
+        if action == "validate" and "invalid" in part["part"]:
+            self._path_helper.add_issue(
+                {
+                    "type": "issue",
+                    "category": "MOCK_ISSUE",
+                    "details": {"part": part["part"], "index": part["index"]},
+                    "reason": f"Mock issue detected in part '{part['part']}'.",
+                }
+            )
+        elif action == "clean":
+            return part["part"].replace("invalid", "valid")
+        return part["part"]
 
-    def test_remove_invalid_characters(self):
-        service = FPV_Base("invalid<>path:/file.txt", sep='/')
-        service.invalid_characters = '<>:'
-        cleaned_path = service.remove_invalid_characters(service.path)
-        assert cleaned_path == "invalidpath/file.txt"
 
-    def test_validate_restricted_names(self):
-        # Test restricted name validation
-        service = FPV_Base("mock/restricted/file.txt", sep='/')
-        service.restricted_names = {"restricted"}
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_restricted_names()
-        assert 'Restricted name "restricted" found' in str(excinfo.value)
+@pytest.fixture
+def mock_path():
+    """Create a mock path object for testing."""
+    return "root/folder/invalid_file.txt"
 
-    def test_remove_restricted_names(self):
-        service = FPV_Base("mock/restricted/file.txt", sep='/')
-        service.restricted_names = {"restricted"}
-        cleaned_path = service.remove_restricted_names(service.path)
-        assert cleaned_path == "mock/file.txt"
 
-    def test_validate_trailing_periods(self):
-        # Validate that trailing periods in parts raise an error
-        service = FPV_Base("mock/path./file.", sep='/')
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_if_part_ends_with_period()
-        assert 'cannot end with a period' in str(excinfo.value)
+@pytest.fixture
+def mock_fpv(mock_path):
+    """Create a mock FPV_Base instance for testing."""
+    return MockFPV(mock_path, sep="/", auto_validate=False, auto_clean=False, relative=False, file_added=True)
 
-    def test_remove_trailing_periods(self):
-        service = FPV_Base("mock/path./file.", sep='/')
-        cleaned_path = service.remove_trailing_periods(service.path)
-        assert cleaned_path == "mock/path/file"
 
-    def test_validate_if_whitespace_around_parts(self):
-        # Test leading/trailing whitespace validation
-        service = FPV_Base("  mock/path/to/file  ", sep='/')
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_if_whitespace_around_parts()
-        assert "Leading or trailing spaces are not allowed" in str(excinfo.value)
+def test_initialization(mock_fpv, mock_path):
+    """Test initialization of FPV_Base and its mock subclass."""
+    assert mock_fpv.path == mock_path.strip("/")
+    assert isinstance(mock_fpv._path_helper, Path)
+    assert mock_fpv.auto_validate is False
+    assert mock_fpv.auto_clean is False
 
-    def test_remove_whitespace_around_parts(self):
-        service = FPV_Base("  mock / path / to / file  ", sep='/')
-        supposedly_clean_path_parts = []
-        for part in service.path.split("/"):
-            cleaned_part = service.remove_whitespace_around_part(part)
-            supposedly_clean_path_parts.append(cleaned_part)
-        cleaned_path = "/".join(supposedly_clean_path_parts)
-        assert cleaned_path == "/mock/path/to/file"
 
-    def test_validate_empty_parts(self):
-        # Test empty part validation in path
-        service = FPV_Base("mock//to//file.txt", sep='/')
-        with pytest.raises(ValueError) as excinfo:
-            service.validate_empty_parts()
-        assert "Empty parts are not allowed" in str(excinfo.value)
+def test_get_logs(mock_fpv):
+    """Test retrieving logs."""
+    mock_fpv._path_helper.logs = {"actions": [], "issues": []}
+    assert mock_fpv.get_logs() == {"actions": [], "issues": []}
 
-    def test_remove_empty_parts(self):
-        service = FPV_Base("mock//to//file.txt", sep='/')
-        cleaned_path = service.remove_empty_parts(service.path)
-        assert cleaned_path == "mock/to/file.txt"
+
+def test_add_part():
+    """Test adding a part to the path."""
+    # Create a fresh mock path without a file added
+    mock_path = "root/folder"
+    mock_fpv = MockFPV(mock_path, sep="/", auto_validate=False, auto_clean=False, relative=False, file_added=False)
+    mock_fpv.max_length = 100 # Set max length to a high value to avoid issues with path length
+
+    # Add a new part
+    mock_fpv.add_part("new_part", is_file=False, mode="validate")
+    assert mock_fpv._path_helper.parts[-1]["part"] == "new_part"
+    assert mock_fpv._path_helper.parts[-1]["is_file"] is False
+
+    # Add a file to ensure is_file behavior is respected
+    mock_fpv.add_part("new_file.txt", is_file=True, mode="validate")
+    assert mock_fpv._path_helper.parts[-1]["part"] == "new_file.txt"
+    assert mock_fpv._path_helper.parts[-1]["is_file"] is True
+
+    # Adding another part now should raise an error since a file is already added
+    with pytest.raises(ValueError, match="Cannot add more parts after a file has been added."):
+        mock_fpv.add_part("should_fail")
+
+
+def test_remove_part(mock_fpv):
+    """Test removing a part from the path."""
+    initial_length = len(mock_fpv._path_helper.parts)
+    mock_fpv.remove_part(2, mode="validate")  # Removing "invalid_file.txt"
+    assert len(mock_fpv._path_helper.parts) == initial_length - 1
+    assert not any(part["part"] == "invalid_file.txt" for part in mock_fpv._path_helper.parts)
+
+
+def test_clean(mock_fpv):
+    """Test cleaning the path."""
+    cleaned_path = mock_fpv.clean(validate_after_clean=True)
+    assert "invalid" not in cleaned_path
+    assert "valid_file.txt" in cleaned_path
+
+
+def test_validate(mock_fpv):
+    """Test validating the path."""
+    with pytest.raises(ValueError) as excinfo:
+        mock_fpv.validate(raise_error=True)
+    issues = mock_fpv.get_logs()["issues"]
+    assert len(issues) > 0
+    assert "MOCK_ISSUE" in issues[0]["category"]
+    assert "invalid_file.txt" in issues[0]["details"]["part"]
+
+
+def test_process_invalid_characters(mock_fpv):
+    """Test processing invalid characters."""
+    part = {"index": 0, "part": "inva?lid", "is_file": False}
+    mock_fpv.invalid_characters = "?*"
+    cleaned_part = mock_fpv.process_invalid_characters(part, action="clean")
+    assert cleaned_part == "invalid"
+    mock_fpv.process_invalid_characters(part, action="validate")
+    issues = mock_fpv.get_logs()["issues"]
+    assert len(issues) > 0
+    assert "INVALID_CHAR" in issues[0]["category"]
+
+
+def test_process_path_length(mock_fpv):
+    """Test processing path length."""
+    mock_fpv.max_length = 10
+    part = {"index": 1, "part": "very_long_part", "is_file": False}
+    mock_fpv.process_path_length(part, action="validate")
+    issues = mock_fpv.get_logs()["issues"]
+    assert len(issues) > 0
+    assert "PATH_LENGTH" in issues[0]["category"]
+    assert issues[0]["details"]["current_length"] > mock_fpv.max_length
+
+
+def test_processing_methods(mock_fpv):
+    """Test processing methods delegation."""
+    root_part = {"index": 0, "part": "root", "is_file": False}
+    mock_fpv.processing_methods()["root"][0](root_part, "validate")
+    issues = mock_fpv.get_logs()["issues"]
+    assert len(issues) == 0  # No issues with valid root
+
+
+def test_clean_with_processing_methods(mock_fpv):
+    """Test cleaning with processing methods applied."""
+    cleaned_path = mock_fpv.clean(validate_after_clean=False)
+    assert "invalid" not in cleaned_path
+    assert "valid_file.txt" in cleaned_path

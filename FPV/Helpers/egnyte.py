@@ -7,7 +7,7 @@ class FPV_Egnyte(FPV_Base):
     invalid_characters = ':*?"<>|'
     max_length = 5000  # Max path length
     part_length = 245  # Max length per path part
-    acceptable_root_patterns = [r"^[A-Za-z]:\\$", r"^[A-Za-z]:/$"]  # Adjust if necessary for Egnyte
+    acceptable_root_patterns = [r"^[A-Za-z]:$", r"^[A-Za-z]:$"]  # Adjust if necessary for Egnyte
 
     restricted_names = {
         ".ds_store", ".metadata_never_index", ".thumbs.db",
@@ -33,135 +33,135 @@ class FPV_Egnyte(FPV_Base):
     def __init__(self, path, **kwargs):
         super().__init__(path, **kwargs)
 
-    def process_part_length(self, action: str):
-        """Process part length based on Egnyte's restrictions."""
-        for i, part in enumerate(self._path_helper.parts):
-            if len(part) > self.part_length:
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "PART_LENGTH",
-                            "details": {"part": part, "index": i},
-                            "reason": f"Part '{part}' exceeds maximum length of {self.part_length} characters.",
-                        }
-                    )
-                elif action == "clean":
-                    truncated_part = part[:self.part_length]
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "PART_LENGTH",
-                            "subtype": "MODIFY",
-                            "priority": 2,
-                            "details": {"original": part, "new_value": truncated_part, "index": i},
-                            "reason": f"Truncated part '{part}' to meet length requirements.",
-                        }
-                    )
+    def processing_methods(self):
+        """Define the processing methods for Egnyte paths."""
+        return {
+            "root": [],
+            "folder": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_restricted_suffixes(part, action),
+                lambda part, action: self.process_restricted_prefixes(part, action),
+                lambda part, action: self.process_temp_patterns(part, action),
+                lambda part, action: self.process_part_length(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+            "file": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_restricted_suffixes(part, action),
+                lambda part, action: self.process_restricted_prefixes(part, action),
+                lambda part, action: self.process_temp_patterns(part, action),
+                lambda part, action: self.process_part_length(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+        }
 
-    def process_restricted_suffixes(self, action: str):
+    def process_restricted_suffixes(self, part: dict, action: str):
         """Process restricted Egnyte suffixes."""
-        for i, part in enumerate(self._path_helper.parts):
-            if any(part.lower().endswith(suffix) for suffix in self.endings):
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "SUFFIX",
-                            "details": {"part": part, "index": i},
-                            "reason": f"Part '{part}' has a restricted suffix.",
-                        }
-                    )
-                elif action == "clean":
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "SUFFIX",
-                            "subtype": "REMOVE",
-                            "priority": 3,
-                            "details": {"part": part, "index": i},
-                            "reason": f"Removed part '{part}' due to restricted suffix.",
-                        }
-                    )
+        if any(part["part"].lower().endswith(suffix) for suffix in self.endings):
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "SUFFIX",
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": "Part has a restricted suffix.",
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "SUFFIX",
+                        "subtype": "REMOVE",
+                        "priority": 3,
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": "Removed part due to restricted suffix.",
+                    },
+                    priority=3
+                )
 
-    def process_restricted_prefixes(self, action: str):
+    def process_restricted_prefixes(self, part: dict, action: str):
         """Process restricted Egnyte prefixes."""
-        for i, part in enumerate(self._path_helper.parts):
-            if any(part.lower().startswith(prefix) for prefix in self.starts):
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "PREFIX",
-                            "details": {"part": part, "index": i},
-                            "reason": f"Part '{part}' has a restricted prefix.",
-                        }
-                    )
-                elif action == "clean":
-                    cleaned_part = part
-                    for prefix in self.starts:
-                        if cleaned_part.lower().startswith(prefix):
-                            cleaned_part = cleaned_part[len(prefix):]
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "PREFIX",
-                            "subtype": "MODIFY",
-                            "priority": 3,
-                            "details": {"original": part, "new_value": cleaned_part, "index": i},
-                            "reason": f"Removed restricted prefix from part '{part}'.",
-                        }
-                    )
+        if any(part["part"].lower().startswith(prefix) for prefix in self.starts):
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "PREFIX",
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": "Part has a restricted prefix.",
+                    }
+                )
+            elif action == "clean":
+                cleaned_part = part["part"]
+                for prefix in self.starts:
+                    if cleaned_part.lower().startswith(prefix):
+                        cleaned_part = cleaned_part[len(prefix):]
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "PREFIX",
+                        "subtype": "MODIFY",
+                        "priority": 3,
+                        "details": {"original": part["part"], "new_value": cleaned_part, "index": part["index"]},
+                        "reason": "Removed restricted prefix from part.",
+                    },
+                    priority=3
+                )
 
-    def process_temp_patterns(self, action: str):
+    def process_temp_patterns(self, part: dict, action: str):
         """Process restricted temporary file patterns."""
-        for i, part in enumerate(self._path_helper.parts):
-            if any(re.match(pattern, part.lower()) for pattern in self.temp_patterns):
-                if action == "validate":
-                    self._path_helper.add_issue(
-                        {
-                            "type": "issue",
-                            "category": "TEMP_PATTERN",
-                            "details": {"part": part, "index": i},
-                            "reason": f"Part '{part}' matches a restricted temporary file pattern.",
-                        }
-                    )
-                elif action == "clean":
-                    self._path_helper.add_action(
-                        {
-                            "type": "action",
-                            "category": "TEMP_PATTERN",
-                            "subtype": "REMOVE",
-                            "priority": 4,
-                            "details": {"part": part, "index": i},
-                            "reason": f"Removed part '{part}' due to restricted temporary file pattern.",
-                        }
-                    )
+        if any(re.match(pattern, part["part"].lower()) for pattern in self.temp_patterns):
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "TEMP_PATTERN",
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": "Part matches a restricted temporary file pattern.",
+                    }
+                )
+            elif action == "clean":
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "TEMP_PATTERN",
+                        "subtype": "REMOVE",
+                        "priority": 4,
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": "Removed part due to restricted temporary file pattern.",
+                    },
+                    priority=4
+                )
 
-    def validate(self):
-        """Validate the path according to Egnyte-specific rules."""
-        self.process_path_length(action="validate")
-        self.process_invalid_characters(action="validate")
-        self.process_restricted_names(action="validate")
-        self.process_restricted_suffixes(action="validate")
-        self.process_restricted_prefixes(action="validate")
-        self.process_temp_patterns(action="validate")
-        self.process_part_length(action="validate")
-        self.process_whitespace(action="validate")
-        self.process_empty_parts(action="validate")
-        super().validate()
-
-    def clean(self, raise_error=True):
-        """Clean and return an Egnyte-compliant path; validate if `raise_error` is True."""
-        self.process_path_length(action="clean")
-        self.process_invalid_characters(action="clean")
-        self.process_restricted_names(action="clean")
-        self.process_restricted_suffixes(action="clean")
-        self.process_restricted_prefixes(action="clean")
-        self.process_temp_patterns(action="clean")
-        self.process_part_length(action="clean")
-        self.process_whitespace(action="clean")
-        self.process_empty_parts(action="clean")
-        if raise_error:
-            self.validate()
-        return super().clean()
+    def process_part_length(self, part: dict, action: str):
+        """Process part length based on Egnyte's restrictions."""
+        if len(part["part"]) > self.part_length:
+            if action == "validate":
+                self._path_helper.add_issue(
+                    {
+                        "type": "issue",
+                        "category": "PART_LENGTH",
+                        "details": {"part": part["part"], "index": part["index"]},
+                        "reason": f"Part exceeds maximum length of {self.part_length} characters.",
+                    }
+                )
+            elif action == "clean":
+                truncated_part = part["part"][:self.part_length]
+                self._path_helper.add_action(
+                    {
+                        "type": "action",
+                        "category": "PART_LENGTH",
+                        "subtype": "MODIFY",
+                        "priority": 2,
+                        "details": {"original": part["part"], "new_value": truncated_part, "index": part["index"]},
+                        "reason": f"Truncated part to meet length requirements.",
+                    },
+                    priority=2
+                )

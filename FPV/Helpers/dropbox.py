@@ -14,27 +14,30 @@ class FPV_Dropbox(FPV_Base):
     }
     acceptable_root_patterns = [r"^/$", r"^/root$"]
 
-    def __init__(self, path: str, **kwargs):
-        super().__init__(path, **kwargs)
+    def __init__(self, path, **kwargs):
+        sep = kwargs.get("sep", "/")  # Default separator is "/"
+        # Check if the first part of the path is explicitly "root"
+        if path.split(sep)[0] != "root" if path.split(sep) else True:
+            kwargs.pop("relative", None)  # Remove relative argument
+            super().__init__(path, relative=True, **kwargs)
+        else:
+            super().__init__(path, **kwargs)
 
-    def validate(self):
-        """Validate the path for Dropbox-specific rules."""
-        self.process_path_length(action="validate")
-        self.process_invalid_characters(action="validate")
-        self.process_restricted_names(action="validate")
-        self.process_whitespace(action="validate")
-        self.process_empty_parts(action="validate")
-        return super().validate()
-
-    def clean(self, raise_error=True):
-        """Clean and return a Dropbox-compliant path."""
-        self.process_path_length(action="clean")
-        self.process_invalid_characters(action="clean")
-        self.process_restricted_names(action="clean")
-        self.process_whitespace(action="clean")
-        self.process_empty_parts(action="clean")
-
-        if raise_error:
-            self.validate()
-
-        return super().clean()
+    def processing_methods(self):
+        """Define the processing methods for Dropbox paths."""
+        return {
+            "root": [],
+            "folder": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+            "file": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+        }
