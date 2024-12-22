@@ -5,49 +5,27 @@ class FPV_ShareFile(FPV_Base):
     # Invalid characters specific to ShareFile
     invalid_characters = ':;*?"<>~'
     max_length = 255  # ShareFile has a maximum path length of 255 characters
+    acceptable_root_patterns = []
 
-    def __init__(self, path: str, **kwargs):
-        super().__init__(path, **kwargs)
-        self.init_kwargs = kwargs
+    def __init__(self, path, **kwargs):
+        kwargs.pop("relative", None)  # Remove relative argument
+        super().__init__(path, relative=True, **kwargs)
 
-        if self.auto_clean:
-            self.path = self.clean()
-
-    def validate(self):
-        """Validate the full path for ShareFile, including invalid characters."""
-        self.validate_path_length()
-        self.validate_invalid_characters()
-        
-        # Validate each part does not end with a period and has no leading/trailing spaces
-        for part in self.path_parts:
-            self.validate_if_part_ends_with_period(part)
-            self.validate_if_whitespace_around_parts(part)
-
-        self.validate_empty_parts()
-
-    def clean(self, raise_error=True):
-        """Clean and return a ShareFile-compliant path; validate if raise_error is True."""
-        cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
-
-        # Remove trailing periods and spaces from each part
-        cleaned_path_parts = []
-        for part in cleaned_path.split(self.sep):
-            part = self.remove_trailing_periods(part)
-            if part:
-                cleaned_path_parts.append(part)
-
-        cleaned_path = self.sep.join(cleaned_path_parts).strip(self.sep)
-        cleaned_path = f"{self.sep}{cleaned_path}" if not cleaned_path.startswith(self.sep) else cleaned_path
-
-        # Revalidate cleaned path if needed
-        if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_ShareFile(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
-
-        return cleaned_path
+    def processing_methods(self):
+        """Define the processing methods for ShareFile paths."""
+        return {
+            "root": [],
+            "folder": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_trailing_periods(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+            "file": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_trailing_periods(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+        }

@@ -2,52 +2,52 @@ from FPV.Helpers._base import FPV_Base
 
 
 class FPV_Dropbox(FPV_Base):
-    # Dropbox has a maximum path length of 260 characters
+    # Dropbox-specific rules
     invalid_characters = '<>:"|?*.'
     max_length = 260
+    restricted_names = {
+        ".lock", "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", 
+        "COM6", "COM7", "COM8", "COM9", "LPT1", 
+        "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
+        "LPT7", "LPT8", "LPT9"
+    }
+    acceptable_root_patterns = [r"^/$", r"^/root$"]
 
-    def __init__(self, path: str, **kwargs):
-        super().__init__(path, **kwargs)
-        self.init_kwargs = kwargs
-        
-        # Define restricted names specific to Dropbox
-        self.restricted_names = {
-            ".lock", "CON", "PRN", "AUX", "NUL",
-            "COM1", "COM2", "COM3", "COM4", "COM5", 
-            "COM6", "COM7", "COM8", "COM9", "LPT1", 
-            "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", 
-            "LPT7", "LPT8", "LPT9"
+    def __init__(self, path, **kwargs):
+        sep = kwargs.get("sep", "/")  # Default separator is "/"
+        # Check if the first part of the path is explicitly "root"
+        if path.split(sep)[0] != "root" if path.split(sep) else True:
+            kwargs.pop("relative", None)  # Remove relative argument
+            super().__init__(path, relative=True, **kwargs)
+        else:
+            super().__init__(path, **kwargs)
+
+    # this is to get around weird quirks where 
+    # dropbos will yell at you for having a "." in a file name which 
+    # doesn't make any sense lol.
+    def process_invalid_characters(self, part, action):
+        if part.get("is_file", False):
+            self.invalid_characters = self.invalid_characters.replace(".", "")
+        cleaned_part = super().process_invalid_characters(part, action) # if action is clean that is
+        self.invalid_characters = '<>:"|?*.'  # Reset invalid characters
+        return cleaned_part
+
+    def processing_methods(self):
+        """Define the processing methods for Dropbox paths."""
+        return {
+            "root": [],
+            "folder": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_empty_parts(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
+            "file": [
+                lambda part, action: self.process_invalid_characters(part, action),
+                lambda part, action: self.process_restricted_names(part, action),
+                lambda part, action: self.process_whitespace(part, action),
+                lambda part, action: self.process_path_length(part, action),
+            ],
         }
-
-        if self.auto_clean:
-            self.path = self.clean()
-
-    def validate(self):
-        """Validate the full path for Dropbox, including Dropbox-specific validations."""
-        self.validate_path_length()
-        self.validate_invalid_characters()
-        self.validate_restricted_names()
-
-        # Ensure each part has no leading/trailing spaces
-        for part in self.path_parts:
-            self.validate_if_whitespace_around_parts(part)
-        
-        self.validate_empty_parts()
-
-    def clean(self, raise_error=True):
-        """Clean and return a Dropbox-compliant path; validate if raise_error is True."""
-        cleaned_path = self.path
-        cleaned_path = self.clean_and_validate_path("path_length", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("invalid_characters", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("restricted_names", path=cleaned_path)
-        cleaned_path = self.clean_and_validate_path("whitespace_around_parts", path=cleaned_path)
-        cleaned_path = self.remove_empty_parts(cleaned_path)
-
-        # Revalidate if needed
-        if raise_error:
-            # pop auto clean from kwargs 
-            self.init_kwargs.pop("auto_clean", None)
-            cleaned_path_instance = FPV_Dropbox(cleaned_path, **self.init_kwargs)
-            cleaned_path_instance.validate()
-
-        return cleaned_path

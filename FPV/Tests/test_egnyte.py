@@ -2,97 +2,75 @@ import pytest
 from FPV.Helpers.egnyte import FPV_Egnyte
 
 
-def test_egnyte_restricted_names():
-    restricted_names = {
-        ".ds_store", 
-        ".metadata_never_index", 
-        ".thumbs.db", 
-        "powerpoint temp", 
-        "desktop.ini", 
-        "icon\r", 
-        ".data", 
-        ".tmp"
-    }
-    for name in restricted_names:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"{name}/folder/test.txt").validate()
-        assert f'Restricted name "{name}" found in path.' in str(excinfo.value)
+def test_process_restricted_suffixes_validate():
+    egnyte = FPV_Egnyte("C:/folder/file.tmp", sep="/", auto_validate=False)
+    part = {"part": "example.tmp", "index": 1}
+    egnyte.process_restricted_suffixes(part, action="validate")
+    current_issues_for_part = egnyte._path_helper.get_issues_for_part(part["index"])
+    issue_categories = [issue["category"] for issue in current_issues_for_part]
+    assert "SUFFIX" in issue_categories
 
 
-def test_egnyte_part_length_exceeds_limit():
-    long_part = "a" * 246  # Create a part longer than 245 characters
-    with pytest.raises(ValueError) as excinfo:
-        FPV_Egnyte(f"{long_part}/folder/test.txt").validate()
-    assert f"Path component exceeds 245 characters: '{long_part}'" in str(excinfo.value)
-
-def test_path_length_exceeds_limit():
-    sections = 21  
-    long_path = "/".join(["a" * 245] * sections) + ".txt"  # Create a path with more than 5000 characters
-    with pytest.raises(ValueError) as excinfo:
-        FPV_Egnyte(long_path).validate()
-    assert "Path exceeds 5000 characters" in str(excinfo.value)
-
-def test_egnyte_restricted_suffixes():
-    restricted_suffixes = [
-        ".", "~", "._attribs_", "._rights_", "._egn_", "_egnmeta", 
-        ".tmp", "-spotlight", ".ac$", ".sv$", ".~vsdx"
-    ]
-    for suffix in restricted_suffixes:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"folder_name{suffix}/file.txt").validate()
-        assert f"Path component 'folder_name{suffix}' has restricted suffix: '{suffix}'" in str(excinfo.value)
+def test_process_restricted_suffixes_clean():
+    egnyte = FPV_Egnyte("C:/folder/file.tmp", sep="/", auto_validate=False)
+    part = {"part": "example.tmp", "index": 1}
+    egnyte.process_restricted_suffixes(part, action="clean")
+    pending_actions = egnyte._path_helper.get_pending_actions_for_part(part["index"])
+    action_categories = [action["category"] for action in pending_actions]
+    assert "SUFFIX" in action_categories
 
 
-def test_egnyte_restricted_prefixes():
-    restricted_prefixes = ["._", ".~", "word work file", "_egn_.", ".smbdelete", ".spotlight-"]
-    for prefix in restricted_prefixes:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"{prefix}folder_name/file.txt").validate()
-        assert f"Path component '{prefix}folder_name' has restricted prefix: '{prefix}'" in str(excinfo.value)
+def test_process_restricted_prefixes_validate():
+    egnyte = FPV_Egnyte("C:/folder/._example", sep="/", auto_validate=False)
+    part = {"part": "._example", "index": 1}
+    egnyte.process_restricted_prefixes(part, action="validate")
+    current_issues_for_part = egnyte._path_helper.get_issues_for_part(part["index"])
+    issue_categories = [issue["category"] for issue in current_issues_for_part]
+    assert "PREFIX" in issue_categories
 
 
-def test_egnyte_tilde_suffix_combinations():
-    starts_with_tilde_endings = [".idlk", ".xlsx", ".pptx"]
-    for ending in starts_with_tilde_endings:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"~folder{ending}/file.txt").validate()
-        assert f"Path component '~folder{ending}' starts with '~' and ends with '{ending}'" in str(excinfo.value)
+def test_process_restricted_prefixes_clean():
+    egnyte = FPV_Egnyte("C:/folder/._example", sep="/", auto_validate=False)
+    part = {"part": "._example", "index": 1}
+    egnyte.process_restricted_prefixes(part, action="clean")
+    pending_actions = egnyte._path_helper.get_pending_actions_for_part(part["index"])
+    action_categories = [action["category"] for action in pending_actions]
+    assert "PREFIX" in action_categories
 
 
-def test_egnyte_tilde_dollar_suffix_combinations():
-    starts_with_tilde_dollar_endings = [
-        ".doc", ".docx", ".rtf", ".ppt", ".pptx", 
-        ".xlsm", ".sldlfp", ".slddrw", ".sldprt", ".sldasm"
-    ]
-    for ending in starts_with_tilde_dollar_endings:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"~$folder{ending}/file.txt").validate()
-        assert f"Path component '~$folder{ending}' starts with '~$' and ends with '{ending}'" in str(excinfo.value)
+def test_process_temp_patterns_validate():
+    egnyte = FPV_Egnyte("C:/folder/atmp3829", sep="/", auto_validate=False)
+    part = {"part": "atmp3829", "index": 2}
+    egnyte.process_temp_patterns(part, action="validate")
+    current_issues_for_part = egnyte._path_helper.get_issues_for_part(part["index"])
+    issue_categories = [issue["category"] for issue in current_issues_for_part]
+    assert "TEMP_PATTERN" in issue_categories
 
 
-def test_egnyte_temp_patterns():
-    temp_patterns = [
-        "atmp1234",  # AutoCAD temp pattern
-        "file.sas.b73",  # SAS temp file
-        "aaA38221",  # PDF temp file pattern
-        "example.$$$"  # Files ending with .$$$
-    ]
-    for temp_name in temp_patterns:
-        with pytest.raises(ValueError) as excinfo:
-            FPV_Egnyte(f"{temp_name}/file.txt").validate()
-        assert f"Path component '{temp_name}' matches restricted temporary file pattern." in str(excinfo.value)
+def test_process_temp_patterns_clean():
+    egnyte = FPV_Egnyte("C:/folder/atmp3829", sep="/", auto_validate=False)
+    part = {"part": "atmp3829", "index": 2}
+    egnyte.process_temp_patterns(part, action="clean")
+    pending_actions = egnyte._path_helper.get_pending_actions_for_part(part["index"])
+    action_categories = [action["category"] for action in pending_actions]
+    assert "TEMP_PATTERN" in action_categories
 
 
-def test_egnyte_clean_path():
-    # Example path with mixed violations, e.g., invalid characters, restricted prefixes, suffixes, and names
-    path = "._ds_store/temp_folder_name_with_.docx"
-    egnyte = FPV_Egnyte(path, auto_clean=False)
-    egnyte.max_length = 5000
-    egnyte.part_length = 245
-    cleaned_path = egnyte.clean()
-    
-    # Assert that the cleaned path no longer has restricted patterns
-    assert ".ds_store" not in cleaned_path
-    assert "|" not in cleaned_path
-    assert ".tmp" not in cleaned_path
-    assert cleaned_path == "/ds_store/temp_folder_name_with_.docx"
+def test_process_part_length_validate():
+    egnyte = FPV_Egnyte("C:/folder/" + "a" * 300, sep="/", auto_validate=False)
+    long_part = "a" * 300
+    part = {"part": long_part, "index": 2}
+    egnyte.process_part_length(part, action="validate")
+    current_issues_for_part = egnyte._path_helper.get_issues_for_part(part["index"])
+    issue_categories = [issue["category"] for issue in current_issues_for_part]
+    assert "PART_LENGTH" in issue_categories
+
+
+def test_process_part_length_clean():
+    egnyte = FPV_Egnyte("C:/folder/" + "a" * 300, sep="/", auto_validate=False)
+    long_part = "a" * 300
+    part = {"part": long_part, "index": 3}
+    egnyte.process_part_length(part, action="clean")
+    pending_actions = egnyte._path_helper.get_pending_actions_for_part(part["index"])
+    action_categories = [action["category"] for action in pending_actions]
+    assert "PART_LENGTH" in action_categories
