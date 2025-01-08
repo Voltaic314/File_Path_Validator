@@ -128,7 +128,7 @@ def test_process_path_length(mock_fpv):
     issues = mock_fpv.get_logs()["issues"]
     assert len(issues) > 0
     assert "PATH_LENGTH" in issues[0]["category"]
-    assert issues[0]["details"]["current_length"] > mock_fpv.max_length
+    assert issues[0]["details"]["index"] == 1
 
 
 def test_processing_methods(mock_fpv):

@@ -95,8 +95,9 @@ class Path:
             removed_part = self.parts.pop(index)
             for i, entry in enumerate(self.parts):
                 entry["index"] = i  # Reindex parts after removal
-            if index == len(self.parts) and self.file_added:
+            if index == len(self.parts) and (self.file_added or self.file_added_to_parts):
                 self.file_added = False
+                self.file_added_to_parts = False
             self.path_length -= len(removed_part["part"]) + len(self.sep)
             # remove any related issues involving that part
             self.logs["issues"] = [issue for issue in self.logs["issues"] if issue.get("details", {}).get("index") != index]

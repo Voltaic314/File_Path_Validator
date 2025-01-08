@@ -134,7 +134,12 @@ class FPV_Base:
             return part_str
 
         index = part["index"]
-        current_length = self._path_helper.path_length
+        # calculate path length instead for full precision
+        current_length = 0
+        for index_of_iteration, part in enumerate(self._path_helper.parts):
+            if index_of_iteration == index:
+                break
+            current_length += len(part["part"]) + len(self.sep)
         part_length = len(part_str)
 
         if action == "validate" and current_length + part_length + len(self.sep) > self.max_length:
@@ -142,25 +147,25 @@ class FPV_Base:
                 {
                     "type": "issue",
                     "category": "PATH_LENGTH",
-                    "details": {"current_length": current_length, "max_length": self.max_length},
+                    "details": {"current_length": current_length, "max_length": self.max_length, "index": index, "part": part_str},
                     "reason": f"Path exceeds maximum length of {self.max_length} characters.",
                 }
             )
         elif action == "clean":
-            remaining_length = self.max_length - (current_length - len(part_str))
-            if remaining_length < 0:
+            remaining_length = self.max_length - (current_length + len(part_str))
+            if remaining_length <= 0 or (remaining_length < len(part_str) and index == (len(self._path_helper.parts) - 1)):
                 self._path_helper.add_action(
                     {
                         "type": "action",
                         "category": "PATH_LENGTH",
                         "subtype": "REMOVE",
-                        "details": {"index": index, "part": part_str},
+                        "details": {"current_length": current_length, "max_length": self.max_length, "index": index, "part": part_str},
                         "reason": f"Removed '{part_str}' to reduce path length to within {self.max_length} characters.",
                     },
                     priority=1
                 )
                 return ''  # Return empty string to remove the part
-            elif remaining_length < len(part_str):
+            else:
                 truncated_part = part_str[:remaining_length]
                 self._path_helper.add_action(
                     {
