@@ -225,7 +225,118 @@ curl -X POST "http://localhost:8000/api/v1/clean" \
 }
 ```
 
+##### Dynamic Path Building Endpoints
+
+For applications like ByteWave that need to build paths incrementally with real-time validation:
+
+###### Add Path Part (`POST /path/add`)
+Adds one or more path parts to an existing path with incremental validation.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/path/add" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "service": "windows",
+       "base_path": "C:\\Users\\golde",
+       "parts": ["Documents"],
+       "errors": [],
+       "validate": true,
+       "relative": false,
+       "file_added": false
+     }'
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "updated_path": "C:\\Users\\golde\\Documents",
+  "new_errors": [],
+  "all_errors": [],
+  "path_parts": ["C:", "Users", "golde", "Documents"],
+  "error": null
+}
+```
+
+###### Remove Path Part (`POST /path/remove`)
+Removes a path part and updates the error state accordingly.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/path/remove" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "service": "windows",
+       "base_path": "C:\\Users\\golde\\Documents",
+       "part_index": 2,
+       "errors": [],
+       "relative": false,
+       "file_added": false
+     }'
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "updated_path": "C:\\Users\\Documents",
+  "remaining_errors": [],
+  "removed_part": "golde",
+  "path_parts": ["C:", "Users", "Documents"],
+  "error": null
+}
+```
+
+###### Build Path Incrementally (`POST /path/build`)
+Builds a complete path step by step with full validation tracking.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/path/build" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "service": "dropbox",
+       "root_path": "/",
+       "path_parts": ["Documents", "Work", "Reports", "Q4_Report.pdf"],
+       "relative": true,
+       "file_added": true
+     }'
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "final_path": "/Documents/Work/Reports/Q4_Report.pdf",
+  "all_errors": [],
+  "step_errors": [
+    {
+      "step": 1,
+      "part": "Documents",
+      "issues": []
+    },
+    {
+      "step": 2,
+      "part": "Work",
+      "issues": []
+    },
+    {
+      "step": 3,
+      "part": "Reports",
+      "issues": []
+    },
+    {
+      "step": 4,
+      "part": "Q4_Report.pdf",
+      "issues": []
+    }
+  ],
+  "path_parts": ["", "Documents", "Work", "Reports", "Q4_Report.pdf"],
+  "error": null
+}
+```
+
 #### 3. Request Parameters
+
+##### Basic Endpoints (`/isValid`, `/clean`)
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
@@ -234,6 +345,44 @@ curl -X POST "http://localhost:8000/api/v1/clean" \
 | `relative` | boolean | No | true | Whether the path is relative (true) or absolute (false) |
 | `file_added` | boolean | No | false | Whether the path includes a file |
 | `sep` | string | No | platform default | Path separator (e.g., "/", "\\") |
+
+##### Dynamic Path Building Endpoints
+
+###### `/path/add` Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `service` | string | Yes | - | Service/platform name |
+| `base_path` | string | Yes | - | Current path to add parts to |
+| `parts` | array | Yes | - | Array of path parts to add |
+| `errors` | array | No | [] | Current error state |
+| `validate` | boolean | No | true | Whether to validate new parts |
+| `relative` | boolean | No | true | Whether the path is relative |
+| `file_added` | boolean | No | false | Whether the path includes a file |
+| `sep` | string | No | platform default | Path separator |
+
+###### `/path/remove` Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `service` | string | Yes | - | Service/platform name |
+| `base_path` | string | Yes | - | Current path to remove part from |
+| `part_index` | integer | Yes | - | Index of part to remove (0-based) |
+| `errors` | array | No | [] | Current error state |
+| `relative` | boolean | No | true | Whether the path is relative |
+| `file_added` | boolean | No | false | Whether the path includes a file |
+| `sep` | string | No | platform default | Path separator |
+
+###### `/path/build` Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `service` | string | Yes | - | Service/platform name |
+| `root_path` | string | Yes | - | Root path to start from |
+| `path_parts` | array | Yes | - | Array of path parts to add sequentially |
+| `relative` | boolean | No | true | Whether the path is relative |
+| `file_added` | boolean | No | false | Whether the path includes a file |
+| `sep` | string | No | platform default | Path separator |
 
 #### 4. Python Client Example
 
@@ -260,13 +409,52 @@ result = response.json()
 print(f"Cleaned path: {result['cleaned_path']}")
 ```
 
-#### 5. Performance
+#### 5. ByteWave Integration Benefits
+
+The dynamic path building endpoints are specifically designed for applications like ByteWave that need to build paths incrementally:
+
+**🚀 Performance Advantages:**
+- **O(1) per path part**: Only validate new parts, not entire paths
+- **Incremental validation**: Skip redundant calculations
+- **State management**: Client maintains lightweight path state
+- **Async-friendly**: Non-blocking operations for UI responsiveness
+
+**💡 Use Cases:**
+- **Real-time path building**: Validate as user types
+- **Drag-and-drop interfaces**: Add/remove folders dynamically
+- **Batch operations**: Build complex paths efficiently
+- **Cross-platform validation**: Same API for all storage providers
+
+**🔧 Implementation Strategy:**
+```python
+# ByteWave can maintain minimal state:
+class PathBuilder:
+    def __init__(self, service="windows"):
+        self.service = service
+        self.path_parts = []
+        self.errors = []
+    
+    def add_part(self, part):
+        # Call /path/add API
+        # Update local state
+        # Return new errors only
+        pass
+    
+    def remove_part(self, index):
+        # Call /path/remove API
+        # Update local state
+        # Return remaining errors
+        pass
+```
+
+#### 6. Performance
 
 The API is optimized for high-throughput scenarios:
 - **Concurrent Requests**: Handles hundreds of requests per second
 - **Async Processing**: Non-blocking I/O for better performance
 - **Memory Efficient**: Minimal overhead for in-memory path processing
 - **Localhost Optimized**: Fast response times for local deployments
+- **Incremental Validation**: Only process new path parts, not entire paths
 
 ---
 
