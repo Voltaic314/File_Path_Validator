@@ -11,7 +11,7 @@ Many cloud storage providers strive to enforce compliance with OS-specific rules
 > (From Logan - Creator of FPV):  
 > "At my company, we often generate file paths for clients from a mix of disjointed data sources. This can result in messy file path strings that may fail at the storage provider or OS level. FPV ensures our paths are flagged with actionable error messages early on.  
 > 
-> For those who prefer automation, FPV’s cleaning functionality can attempt to fix paths proactively. Whether you're debugging paths manually or streamlining cleanup, FPV has been a game-changer for us. I hope you find it equally helpful!"
+> For those who prefer automation, FPV's cleaning functionality can attempt to fix paths proactively. Whether you're debugging paths manually or streamlining cleanup, FPV has been a game-changer for us. I hope you find it equally helpful!"
 
 ---
 
@@ -38,7 +38,7 @@ pip install file-path-validator
 - **SharePoint**
 - **ShareFile**
 
-Each class inherits from `FPV_Base`, defining unique validation and cleaning rules tailored to the platform or provider while leveraging the library’s core functionality.
+Each class inherits from `FPV_Base`, defining unique validation and cleaning rules tailored to the platform or provider while leveraging the library's core functionality.
 
 ---
 
@@ -131,6 +131,142 @@ try:
 except ValueError as e:
     print("Cleaning Error:", e)
 ```
+
+---
+
+## 🌐 REST API
+
+FPV includes a high-performance REST API built with Quart (async Flask-compatible framework) for easy integration into web applications and microservices.
+
+### API Features
+- **Async Processing**: Handles hundreds of concurrent requests efficiently
+- **Python 3.13+ Compatible**: No Pydantic dependencies
+- **JSON Request/Response**: Simple REST interface
+- **CORS Enabled**: Works with web applications
+- **Health Monitoring**: Built-in health check endpoint
+
+### Quick Start
+
+#### 1. Run the API Server
+```bash
+# Method 1: Using the provided script
+python run_api.py
+
+# Method 2: Direct execution
+python FPV/API/api.py
+```
+
+The server starts on `http://localhost:8000`
+
+#### 2. API Endpoints
+
+**Base URL**: `http://localhost:8000/api/v1`
+
+##### Validate Path (`POST /isValid`)
+Validates a file path according to the specified service's rules.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/isValid" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "service": "dropbox",
+       "path": "/Documents/test.txt",
+       "file_added": true
+     }'
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "is_valid": true,
+  "issues": [],
+  "logs": {"actions": [], "issues": []},
+  "error": null
+}
+```
+
+##### Clean Path (`POST /clean`)
+Cleans a file path by applying platform-specific fixes.
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/clean" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "service": "windows",
+       "path": "C:\\Test<Folder>\\file*.txt",
+       "relative": false,
+       "file_added": true
+     }'
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "cleaned_path": "C:\\TestFolder\\file.txt",
+  "logs": {
+    "actions": [
+      {
+        "type": "action",
+        "category": "INVALID_CHAR",
+        "subtype": "MODIFY",
+        "details": {
+          "original": "Test<Folder>",
+          "new_value": "TestFolder",
+          "index": 1
+        },
+        "reason": "Removed invalid characters."
+      }
+    ],
+    "issues": []
+  },
+  "error": null
+}
+```
+
+#### 3. Request Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `service` | string | Yes | - | Service/platform name (windows, macos, linux, dropbox, box, egnyte, onedrive, sharepoint, sharefile) |
+| `path` | string | Yes | - | File path to validate/clean |
+| `relative` | boolean | No | true | Whether the path is relative (true) or absolute (false) |
+| `file_added` | boolean | No | false | Whether the path includes a file |
+| `sep` | string | No | platform default | Path separator (e.g., "/", "\\") |
+
+#### 4. Python Client Example
+
+```python
+import requests
+
+# Validate a path
+response = requests.post("http://localhost:8000/api/v1/isValid", json={
+    "service": "dropbox",
+    "path": "/Documents/test.txt",
+    "file_added": True
+})
+result = response.json()
+print(f"Path is valid: {result['is_valid']}")
+
+# Clean a path
+response = requests.post("http://localhost:8000/api/v1/clean", json={
+    "service": "windows",
+    "path": "C:\\Test<Folder>\\file*.txt",
+    "relative": False,
+    "file_added": True
+})
+result = response.json()
+print(f"Cleaned path: {result['cleaned_path']}")
+```
+
+#### 5. Performance
+
+The API is optimized for high-throughput scenarios:
+- **Concurrent Requests**: Handles hundreds of requests per second
+- **Async Processing**: Non-blocking I/O for better performance
+- **Memory Efficient**: Minimal overhead for in-memory path processing
+- **Localhost Optimized**: Fast response times for local deployments
 
 ---
 
