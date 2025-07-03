@@ -48,26 +48,26 @@ async def add_path_part():
         fpv_module = importlib.import_module("FPV.Helpers")
         fpv_class = getattr(fpv_module, service_mapping[service])
         
-        # Create validator with base path
-        kwargs = {"auto_clean": False, "auto_validate": False, "relative": relative, "file_added": file_added}
+        # Create validator from existing state to avoid revalidation
+        kwargs = {"relative": relative, "file_added": file_added}
         if sep:
             kwargs["sep"] = sep
             
-        validator = fpv_class(base_path, **kwargs)
+        validator = fpv_class.from_state(base_path, existing_errors=existing_errors, **kwargs)
         
-        # Add parts one by one
+        # Add parts one by one with incremental validation
         new_errors = []
         for i, part in enumerate(parts_to_add):
             is_file = file_added and i == len(parts_to_add) - 1
-            validator.add_part(part, is_file=is_file)
+            validator.add_part(part, is_file=is_file, validate_new_only=True)
             
             if validate:
-                # Get validation issues for the newly added part
+                # Get validation issues for the newly added part only
                 part_issues = validator.get_issues_for_part(len(validator._path_helper.parts) - 1)
                 new_errors.extend(part_issues)
         
-        # Combine existing errors with new ones
-        all_errors = existing_errors + new_errors
+        # Get all errors (existing + new)
+        all_errors = validator.get_logs()["issues"]
         
         return jsonify({
             "success": True,
@@ -118,25 +118,18 @@ async def remove_path_part():
         fpv_module = importlib.import_module("FPV.Helpers")
         fpv_class = getattr(fpv_module, service_mapping[service])
         
-        # Create validator with base path
-        kwargs = {"auto_clean": False, "auto_validate": False, "relative": relative, "file_added": file_added}
+        # Create validator from existing state
+        kwargs = {"relative": relative, "file_added": file_added}
         if sep:
             kwargs["sep"] = sep
             
-        validator = fpv_class(base_path, **kwargs)
+        validator = fpv_class.from_state(base_path, existing_errors=existing_errors, **kwargs)
         
-        # Remove the specified part
+        # Remove the specified part with automatic error cleanup
         if part_index < len(validator._path_helper.parts):
             removed_part = validator._path_helper.parts[part_index]["part"]
-            validator.remove_part(part_index)
-            
-            # Filter out errors that were related to the removed part
-            remaining_errors = []
-            for error in existing_errors:
-                # Keep errors that don't reference the removed part
-                # This is a simple heuristic - you might want to make this more sophisticated
-                if not any(removed_part in str(error_detail) for error_detail in error.get('details', [])):
-                    remaining_errors.append(error)
+            validator.remove_part(part_index, remove_related_errors=True)
+            remaining_errors = validator.get_logs()["issues"]
         else:
             remaining_errors = existing_errors
             removed_part = None
@@ -186,21 +179,21 @@ async def build_path_incrementally():
         fpv_class = getattr(fpv_module, service_mapping[service])
         
         # Create validator with root path
-        kwargs = {"auto_clean": False, "auto_validate": False, "relative": relative, "file_added": file_added}
+        kwargs = {"relative": relative, "file_added": file_added}
         if sep:
             kwargs["sep"] = sep
             
-        validator = fpv_class(root_path, **kwargs)
+        validator = fpv_class.from_state(root_path, **kwargs)
         
         step_errors = []
         all_errors = []
         
-        # Build path step by step
+        # Build path step by step with incremental validation
         for i, part in enumerate(path_parts):
             is_file = file_added and i == len(path_parts) - 1
-            validator.add_part(part, is_file=is_file)
+            validator.add_part(part, is_file=is_file, validate_new_only=True)
             
-            # Get validation issues for this step
+            # Get validation issues for this step only
             step_issues = validator.get_issues_for_part(len(validator._path_helper.parts) - 1)
             step_errors.append({
                 "step": i + 1,

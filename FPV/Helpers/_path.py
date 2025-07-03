@@ -1,20 +1,28 @@
 class Path:
     """Manages path state and provides stack-like operations."""
 
-    def __init__(self, initial_path: str, sep: str = "/", relative: bool = True, file_added: bool = False):
+    def __init__(self, initial_path: str, sep: str = "/", relative: bool = True, file_added: bool = False, existing_errors: list = None, existing_actions: list = None):
         initial_path = initial_path.strip(sep)
         self.parts = []
         self.sep = sep
         self.relative = relative
         self.file_added = file_added
         self.actions_queue = []  # Store actions with priorities
-        self.logs = {"actions": [], "issues": []}  # Unified logs for actions and validation issues
+        self.logs = {"actions": existing_actions or [], "issues": existing_errors or []}  # Load existing state
         self.path_length = 0 # currently until the other parts are added, this is 0.
         self.file_added_to_parts = False
-        for i, part in enumerate(initial_path.split(sep)):
-            self.add_part(part, is_file=(i == len(initial_path.split(sep)) - 1) and file_added)
+        
+        # Parse initial path into parts
+        path_parts = initial_path.split(sep)
+        for i, part in enumerate(path_parts):
+            self.add_part(part, is_file=(i == len(path_parts) - 1) and file_added)
+        
         self.file_added_to_parts = True if file_added else False
         self.path_length = self.get_path_length()  # Initialize the starting path length
+        
+        # If we have existing errors/actions, mark parts as already processed
+        if existing_errors or existing_actions:
+            self._mark_existing_parts_as_processed()
 
     def get_full_path(self) -> str:
         """Generate and return the cleaned path after applying all actions."""
@@ -210,3 +218,28 @@ class Path:
     def get_logs(self) -> dict:
         """Retrieve all logs."""
         return self.logs
+    
+    def _mark_existing_parts_as_processed(self):
+        """
+        Mark parts that already have errors or actions as processed to avoid revalidation.
+        """
+        # Get all part indices that have existing errors or actions
+        processed_indices = set()
+        
+        # Check for errors
+        for error in self.logs["issues"]:
+            index = error.get("details", {}).get("index")
+            if index is not None:
+                processed_indices.add(index)
+        
+        # Check for actions
+        for action in self.logs["actions"]:
+            index = action.get("details", {}).get("index")
+            if index is not None:
+                processed_indices.add(index)
+        
+        # Mark these parts as already processed
+        for index in processed_indices:
+            if 0 <= index < len(self.parts):
+                self.parts[index]["checked_status"] = "complete"
+                self.parts[index]["cleaned_status"] = "complete"

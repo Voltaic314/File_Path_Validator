@@ -12,8 +12,8 @@ class FPV_Base:
     restricted_names: set = set()
     acceptable_root_patterns: List[str] = []
 
-    def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, auto_clean: bool = False, relative: bool = True, file_added: bool = False):
-        self._path_helper = Path(initial_path=path.strip(sep), sep=sep, relative=relative, file_added=file_added)
+    def __init__(self, path: str, sep: str = '/', auto_validate: bool = True, auto_clean: bool = False, relative: bool = True, file_added: bool = False, existing_errors: List[dict] = None, existing_actions: List[dict] = None):
+        self._path_helper = Path(initial_path=path.strip(sep), sep=sep, relative=relative, file_added=file_added, existing_errors=existing_errors, existing_actions=existing_actions)
         self.auto_validate = auto_validate
         self.auto_clean = auto_clean
         self.sep = sep
@@ -32,29 +32,67 @@ class FPV_Base:
         """Retrieve logs from Path helper."""
         return self._path_helper.get_logs()
     
-    def add_part(self, part: str, is_file: bool = False, mode: str = "validate"):
-        """Add a new part to the path, process it, and check overall validity."""
+    def add_part(self, part: str, is_file: bool = False, mode: str = "validate", validate_new_only: bool = True):
+        """
+        Add a new part to the path, process it, and check validity.
+        
+        Args:
+            part: The part to add
+            is_file: Whether this part is a file
+            mode: "validate" or "clean"
+            validate_new_only: If True, only validate the new part (not entire path)
+        """
         self._path_helper.add_part(part, is_file=is_file)
-
-        # Process the specific part (validate or clean based on mode)
-        if mode.lower() == "clean" or self.auto_clean:
-            self.clean()  # Clean the path after addition
-        if mode.lower() == "validate" or self.auto_validate:
-            self.validate()  # Revalidate the path after addition
+        
+        if validate_new_only:
+            # Only validate the newly added part
+            new_part_index = len(self._path_helper.parts) - 1
+            new_part = self._path_helper.parts[new_part_index]
+            
+            if mode.lower() == "clean" or self.auto_clean:
+                self._clean_single_part(new_part_index)
+            if mode.lower() == "validate" or self.auto_validate:
+                self._validate_single_part(new_part_index)
+        else:
+            # Process the entire path (legacy behavior)
+            if mode.lower() == "clean" or self.auto_clean:
+                self.clean()
+            if mode.lower() == "validate" or self.auto_validate:
+                self.validate()
 
         # Always check path length after every modification
         self.process_path_length(self._path_helper.parts[-1], action="validate" if mode == "validate" else "clean")
 
-    def remove_part(self, index: int, mode: str = "validate"):
-        """Remove a part from the path, process remaining, and check validity."""
-        self._path_helper.remove_part(index)
+    def remove_part(self, index: int, mode: str = "validate", remove_related_errors: bool = True):
+        """
+        Remove a part from the path and optionally remove related errors.
         
-        # Process the specific part (validate or clean based on mode)
-        if mode.lower() == "clean" or self.auto_clean:
-            self.clean()  # Clean the path after addition
-        if mode.lower() == "validate" or self.auto_validate:
-            self.validate()  # Revalidate the path after addition
+        Args:
+            index: Index of the part to remove
+            mode: "validate" or "clean"
+            remove_related_errors: If True, remove errors related to the removed part
+        """
+        if 0 <= index < len(self._path_helper.parts):
+            removed_part = self._path_helper.parts[index]["part"]
+            self._path_helper.remove_part(index)
+            
+            if remove_related_errors:
+                # Remove errors that were related to the removed part
+                self._path_helper.logs["issues"] = [
+                    error for error in self._path_helper.logs["issues"]
+                    if error.get("details", {}).get("index") != index
+                ]
+                
+                # Remove actions that were related to the removed part
+                self._path_helper.logs["actions"] = [
+                    action for action in self._path_helper.logs["actions"]
+                    if action.get("details", {}).get("index") != index
+                ]
+                
+                # Reindex remaining errors and actions
+                self._reindex_errors_and_actions(index)
         
+        # Check path length after removal
         self.process_path_length(part={}, action="validate" if mode == "validate" else "clean")
 
     def process_invalid_characters(self, part: dict, action: str):
@@ -327,8 +365,29 @@ class FPV_Base:
             pending_actions = self._path_helper.get_pending_actions_for_part(part_index)
             status = "pending" if pending_actions else "complete"
             self._path_helper.mark_part(part_index, state="cleaned_status", status=status)
-            self._path_helper.mark_part(part_index, state="checked_status", status="unseen") if validate_after_clean else None
-            # mark it as unseen so that validate checks it again if validate_after_clean is True
+            self._path_helper.mark_part(part_index, state="checked_status", status="unseen")
+
+        if validate_after_clean:
+            self.validate(**kwargs)
+    
+    def _reindex_errors_and_actions(self, removed_index: int, validate_after_clean: bool = True, **kwargs):
+        """
+        Reindex errors and actions after a part has been removed.
+        
+        Args:
+            removed_index: Index of the part that was removed
+        """
+        # Reindex errors
+        for error in self._path_helper.logs["issues"]:
+            index = error.get("details", {}).get("index")
+            if index is not None and index > removed_index:
+                error["details"]["index"] = index - 1
+        
+        # Reindex actions
+        for action in self._path_helper.logs["actions"]:
+            index = action.get("details", {}).get("index")
+            if index is not None and index > removed_index:
+                action["details"]["index"] = index - 1
 
         cleaned_path = self._path_helper.get_full_path()
 
@@ -386,3 +445,94 @@ class FPV_Base:
         Retrieve the full path after applying all actions.
         """
         return self._path_helper.get_full_path()
+    
+    def get_current_state(self) -> Dict[str, List[dict]]:
+        """
+        Get the current state including errors and actions for stateless operations.
+        
+        Returns:
+            Dict containing 'errors' and 'actions' lists
+        """
+        return {
+            "errors": self._path_helper.get_logs().get("issues", []),
+            "actions": self._path_helper.get_logs().get("actions", [])
+        }
+    
+    def get_path_parts(self) -> List[str]:
+        """
+        Get the current path parts as a list of strings.
+        
+        Returns:
+            List of path part strings
+        """
+        return [part["part"] for part in self._path_helper.parts]
+    
+    @classmethod
+    def from_state(cls, path: str, existing_errors: List[dict] = None, existing_actions: List[dict] = None, **kwargs):
+        """
+        Create a new FPV instance from existing state without revalidating.
+        
+        Args:
+            path: The current path
+            existing_errors: List of existing validation errors
+            existing_actions: List of existing actions
+            **kwargs: Other constructor arguments
+            
+        Returns:
+            New FPV instance with loaded state
+        """
+        # Disable auto-validation and auto-clean to prevent rechecking
+        kwargs['auto_validate'] = False
+        kwargs['auto_clean'] = False
+        kwargs['existing_errors'] = existing_errors or []
+        kwargs['existing_actions'] = existing_actions or []
+        
+        return cls(path, **kwargs)
+    
+    def _validate_single_part(self, part_index: int):
+        """
+        Validate only a single part without affecting other parts.
+        
+        Args:
+            part_index: Index of the part to validate
+        """
+        if 0 <= part_index < len(self._path_helper.parts):
+            part = self._path_helper.parts[part_index]
+            part_type = self._path_helper.get_part_type(part)
+            
+            # Get the appropriate processing methods based on the part type
+            processing_methods = self.processing_methods().get(part_type, [])
+            
+            # Process the part with each method
+            for process_method in processing_methods:
+                process_method(part, action="validate")
+            
+            # Determine the checked status based on validation issues
+            issues_for_part = self._path_helper.get_issues_for_part(part_index)
+            status = "invalid" if issues_for_part else "complete"
+            self._path_helper.mark_part(part_index, state="checked_status", status=status)
+    
+    def _clean_single_part(self, part_index: int):
+        """
+        Clean only a single part without affecting other parts.
+        
+        Args:
+            part_index: Index of the part to clean
+        """
+        if 0 <= part_index < len(self._path_helper.parts):
+            part = self._path_helper.parts[part_index]
+            part_type = self._path_helper.get_part_type(part)
+            
+            # Get the appropriate processing methods based on the part type
+            processing_methods = self.processing_methods().get(part_type, [])
+            
+            # Process the part with each method
+            for process_method in processing_methods:
+                cleaned_item = process_method(part, action="clean")
+                self._path_helper.parts[part_index]["part"] = cleaned_item
+            
+            # Determine the cleaned status based on pending actions
+            pending_actions = self._path_helper.get_pending_actions_for_part(part_index)
+            status = "pending" if pending_actions else "complete"
+            self._path_helper.mark_part(part_index, state="cleaned_status", status=status)
+            self._path_helper.mark_part(part_index, state="checked_status", status="unseen")
